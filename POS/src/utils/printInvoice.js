@@ -293,8 +293,9 @@ async function getPrintFormatMeta(printFormat) {
 			filters: { name: printFormat },
 			fieldname: ["name", "raw_printing"],
 		})
-		printFormatMetaCache.set(printFormat, meta || null)
-		return meta || null
+		const normalizedMeta = meta?.message || meta
+		printFormatMetaCache.set(printFormat, normalizedMeta || null)
+		return normalizedMeta || null
 	} catch (err) {
 		log.warn(`Could not fetch Print Format metadata for ${printFormat}:`, err?.message || err)
 		printFormatMetaCache.set(printFormat, null)
@@ -304,7 +305,7 @@ async function getPrintFormatMeta(printFormat) {
 
 async function isRawPrintFormat(printFormat) {
 	const meta = await getPrintFormatMeta(printFormat)
-	return Boolean(Number.parseInt(meta?.raw_printing || 0, 10))
+	return Boolean(Number.parseInt(meta?.raw_printing ?? 0, 10))
 }
 
 // ============================================================================
