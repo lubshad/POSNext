@@ -290,10 +290,11 @@ def get_item_detail(item, doc=None, warehouse=None, price_list=None, company=Non
 		fields=["uom", "conversion_factor"],
 	)
 
-	# Add stock UOM if not already in uoms list
+	# Match get_items(): the cart renders stock_uom separately, so item_uoms
+	# should contain alternate UOMs only.
 	stock_uom = item_data.get("stock_uom")
-	if stock_uom and not any(u.get("uom") == stock_uom for u in uoms):
-		uoms.append({"uom": stock_uom, "conversion_factor": 1.0})
+	if stock_uom:
+		uoms = [u for u in uoms if u.get("uom") != stock_uom]
 
 	res["item_uoms"] = uoms
 
