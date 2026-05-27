@@ -788,9 +788,11 @@ const {
 })
 
 // Local state
+const VIEW_MODE_STORAGE_PREFIX = "pos_next_items_view_mode"
+const VALID_VIEW_MODES = new Set(["grid", "list"])
 const viewMode = ref("grid")
 const itemThreshold = ref(50) // Threshold for auto-switching to list view
-const userManuallySetView = ref(false) // Track if user manually changed view mode
+const userManuallySetView = ref(false) // Tracks whether user/default preference should block auto-switching
 const lastAutoSwitchCount = ref(0)
 const showSortDropdown = ref(false) // Sort dropdown visibility
 const skipPageReset = ref(false) // Skip page reset when navigating via pagination
@@ -927,6 +929,63 @@ const activeFilterOptions = computed(() => (
 ))
 const selectedFilterLabel = computed(() => selectedBrand.value || selectedItemGroup.value || null)
 
+function getViewModeStorageKey(posProfile = props.posProfile) {
+	return `${VIEW_MODE_STORAGE_PREFIX}:${posProfile || "default"}`
+}
+
+function getStoredViewMode(posProfile = props.posProfile) {
+	if (typeof window === "undefined" || !window.localStorage) {
+		return null
+	}
+
+	try {
+		const storedViewMode = window.localStorage.getItem(
+			getViewModeStorageKey(posProfile),
+		)
+		return VALID_VIEW_MODES.has(storedViewMode) ? storedViewMode : null
+	} catch {
+		return null
+	}
+}
+
+function saveViewModePreference(mode, posProfile = props.posProfile) {
+	if (
+		!VALID_VIEW_MODES.has(mode) ||
+		typeof window === "undefined" ||
+		!window.localStorage
+	) {
+		return
+	}
+
+	try {
+		window.localStorage.setItem(getViewModeStorageKey(posProfile), mode)
+	} catch {
+		// Ignore storage errors; the in-memory view mode still updates.
+	}
+}
+
+function getDefaultViewMode() {
+	return settingsStore.defaultCardView ? "grid" : "list"
+}
+
+function restoreViewModePreference(posProfile = props.posProfile) {
+	const storedViewMode = getStoredViewMode(posProfile)
+	if (storedViewMode) {
+		viewMode.value = storedViewMode
+		userManuallySetView.value = true
+		return true
+	}
+
+	if (settingsStore.isLoaded) {
+		viewMode.value = getDefaultViewMode()
+		userManuallySetView.value = true
+		return true
+	}
+
+	userManuallySetView.value = false
+	return false
+}
+
 // Watch for cart items and pos profile changes (optimized - uses length + hash instead of deep watch)
 // Tracks: length, item_code, quantity, and amount to detect all cart changes including array replacements
 watch(
@@ -942,10 +1001,20 @@ watch(
 	() => props.posProfile,
 	(newProfile) => {
 		if (newProfile) {
+			restoreViewModePreference(newProfile)
 			itemStore.setPosProfile(newProfile)
 		}
 	},
 	{ immediate: true },
+)
+
+watch(
+	() => [settingsStore.isLoaded, settingsStore.defaultCardView, props.posProfile],
+	() => {
+		if (!getStoredViewMode()) {
+			restoreViewModePreference()
+		}
+	},
 )
 
 // Reset to page 1 when filtered items meaningfully change (group switch, search, etc.)
@@ -1196,8 +1265,13 @@ watch(viewMode, async () => {
 
 // View mode functions
 function setViewMode(mode) {
+	if (!VALID_VIEW_MODES.has(mode)) {
+		return
+	}
+
 	viewMode.value = mode
 	userManuallySetView.value = true
+	saveViewModePreference(mode)
 }
 
 function handleAllFilterClick() {
