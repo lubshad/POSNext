@@ -718,6 +718,7 @@
 <script setup>
 import LazyImage from "@/components/common/LazyImage.vue"
 import WarehouseAvailabilityDialog from "@/components/sale/WarehouseAvailabilityDialog.vue"
+import { session } from "@/data/session"
 import { useItemSearchStore } from "@/stores/itemSearch"
 import { usePOSSettingsStore } from "@/stores/posSettings"
 import { useStock } from "@/composables/useStock"
@@ -929,7 +930,11 @@ const activeFilterOptions = computed(() => (
 ))
 const selectedFilterLabel = computed(() => selectedBrand.value || selectedItemGroup.value || null)
 
-function getViewModeStorageKey(posProfile = props.posProfile) {
+function getViewModeStorageKey(posProfile = props.posProfile, user = session.user) {
+	return `${VIEW_MODE_STORAGE_PREFIX}:${user || "anonymous"}:${posProfile || "default"}`
+}
+
+function getLegacyViewModeStorageKey(posProfile = props.posProfile) {
 	return `${VIEW_MODE_STORAGE_PREFIX}:${posProfile || "default"}`
 }
 
@@ -942,7 +947,14 @@ function getStoredViewMode(posProfile = props.posProfile) {
 		const storedViewMode = window.localStorage.getItem(
 			getViewModeStorageKey(posProfile),
 		)
-		return VALID_VIEW_MODES.has(storedViewMode) ? storedViewMode : null
+		if (VALID_VIEW_MODES.has(storedViewMode)) {
+			return storedViewMode
+		}
+
+		const legacyViewMode = window.localStorage.getItem(
+			getLegacyViewModeStorageKey(posProfile),
+		)
+		return VALID_VIEW_MODES.has(legacyViewMode) ? legacyViewMode : null
 	} catch {
 		return null
 	}
@@ -973,6 +985,7 @@ function restoreViewModePreference(posProfile = props.posProfile) {
 	if (storedViewMode) {
 		viewMode.value = storedViewMode
 		userManuallySetView.value = true
+		saveViewModePreference(storedViewMode, posProfile)
 		return true
 	}
 
@@ -1009,7 +1022,7 @@ watch(
 )
 
 watch(
-	() => [settingsStore.isLoaded, settingsStore.defaultCardView, props.posProfile],
+	() => [settingsStore.isLoaded, settingsStore.defaultCardView, props.posProfile, session.user],
 	() => {
 		if (!getStoredViewMode()) {
 			restoreViewModePreference()
