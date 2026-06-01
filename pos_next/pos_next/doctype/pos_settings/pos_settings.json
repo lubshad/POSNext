@@ -56,6 +56,8 @@
   "section_break_printing",
   "allow_print_last_invoice",
   "silent_print",
+  "print_closing_report",
+  "closing_report_print_format",
   "section_break_delivery",
   "use_delivery_charges",
   "auto_set_delivery_charges",
@@ -431,6 +433,20 @@
    "label": "Enable Silent Print"
   },
   {
+   "default": "0",
+   "description": "Print the shift closing report after closing the POS shift",
+   "fieldname": "print_closing_report",
+   "fieldtype": "Check",
+   "label": "Print Closing Report"
+  },
+  {
+   "description": "Optional Print Format for submitted POS Closing Shift reports. Leave empty to use the built-in closing report.",
+   "fieldname": "closing_report_print_format",
+   "fieldtype": "Link",
+   "label": "Closing Report Print Format",
+   "options": "Print Format"
+  },
+  {
    "collapsible": 1,
    "fieldname": "section_break_delivery",
    "fieldtype": "Section Break",
@@ -550,7 +566,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-11 16:52:08.009217",
+ "modified": "2026-06-01 17:51:09.000000",
  "modified_by": "Administrator",
  "module": "POS Next",
  "name": "POS Settings",

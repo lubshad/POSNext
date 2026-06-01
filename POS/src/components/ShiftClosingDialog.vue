@@ -511,6 +511,7 @@ import { useShift, shiftState } from "../composables/useShift"
 import { useFormatters } from "../composables/useFormatters"
 import { usePOSSettingsStore } from "../stores/posSettings"
 import { usePOSShiftStore } from "../stores/posShift"
+import { printClosingReportWithFallback } from "../utils/printClosingReport"
 import TranslatedHTML from "./common/TranslatedHTML.vue"
 
 const props = defineProps({
@@ -533,9 +534,11 @@ const open = computed({
 })
 
 const { getClosingShiftData, submitClosingShift } = useShift()
-const { formatCurrency, formatQuantity, formatDateTime, formatTime } = useFormatters()
+const { formatCurrency, formatQuantity, formatDateTime, formatTime } =
+	useFormatters()
 const posSettingsStore = usePOSSettingsStore()
-const { hideExpectedAmount } = storeToRefs(posSettingsStore)
+const { hideExpectedAmount, printClosingReport, silentPrint } =
+	storeToRefs(posSettingsStore)
 
 const shiftStore = usePOSShiftStore()
 
@@ -660,7 +663,24 @@ async function submitClosing() {
 		}
 
 		// Submit to server
-		await submitResource.submit({ closing_shift: closingData.value })
+		const closeResult = await submitResource.submit({
+			closing_shift: closingData.value,
+		})
+		const closingShiftName =
+			closeResult?.name ||
+			closeResult?.message?.name ||
+			submitResource.data?.name ||
+			submitResource.data?.message?.name
+
+		if (printClosingReport.value && closingShiftName) {
+			const printResult = await printClosingReportWithFallback(
+				closingShiftName,
+				silentPrint.value,
+			)
+			if (!printResult.success) {
+				console.warn("Closing report print failed")
+			}
+		}
 
 		// If hideExpectedAmount is enabled, show success report before closing
 		if (hideExpectedAmount.value) {

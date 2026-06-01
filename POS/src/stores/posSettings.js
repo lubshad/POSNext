@@ -51,6 +51,8 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 		// Printing
 		allow_print_last_invoice: 0,
 		silent_print: 0,
+		print_closing_report: 0,
+		closing_report_print_format: "",
 		// Delivery
 		use_delivery_charges: 0,
 		auto_set_delivery_charges: 0,
@@ -189,6 +191,9 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 		Boolean(settings.value.allow_print_last_invoice),
 	)
 	const silentPrint = computed(() => Boolean(settings.value.silent_print))
+	const printClosingReport = computed(() =>
+		Boolean(settings.value.print_closing_report),
+	)
 
 	// Computed - Delivery
 	const useDeliveryCharges = computed(() =>
@@ -332,6 +337,8 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 			fetch_coupon: 0,
 			allow_print_last_invoice: 0,
 			silent_print: 0,
+			print_closing_report: 0,
+			closing_report_print_format: "",
 			use_delivery_charges: 0,
 			auto_set_delivery_charges: 0,
 			use_limit_search: 0,
@@ -455,6 +462,7 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 		// Computed - Printing
 		allowPrintLastInvoice,
 		silentPrint,
+		printClosingReport,
 
 		// Computed - Delivery
 		useDeliveryCharges,

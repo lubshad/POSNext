@@ -15,6 +15,15 @@ frappe.ui.form.on("POS Settings", {
 			};
 		});
 
+		frm.set_query("closing_report_print_format", function () {
+			return {
+				filters: {
+					doc_type: "POS Closing Shift",
+					disabled: 0,
+				},
+			};
+		});
+
 		// Fetch company when form loads
 		if (frm.doc.pos_profile) {
 			fetch_pos_profile_company(frm);
