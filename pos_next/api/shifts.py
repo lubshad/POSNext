@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 import json
 import frappe
 from frappe import _
-from frappe.utils import nowdate, nowtime, get_datetime
+from frappe.utils import format_datetime, nowdate, nowtime, get_datetime
 from pos_next.api.utilities import get_wallet_payment_modes
 
 
@@ -182,3 +182,182 @@ def submit_closing_shift(closing_shift):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Submit Closing Shift Error")
 		frappe.throw(_("Error submitting closing shift: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_closing_shift_print_html(closing_shift: str) -> dict:
+	"""Return printable payload for a submitted POS Closing Shift."""
+	if not closing_shift:
+		frappe.throw(_("Closing Shift is required"))
+
+	try:
+		doc = frappe.get_doc("POS Closing Shift", closing_shift)
+		if doc.docstatus != 1:
+			frappe.throw(_("Only submitted closing shifts can be printed"))
+
+		doc.check_permission("read")
+		fallback_html = _get_builtin_closing_shift_print_html(doc)
+		print_format = _get_closing_report_print_format(doc.pos_profile)
+
+		if not print_format:
+			return {"type": "html", "html": fallback_html}
+
+		if print_format.raw_printing:
+			raw_result = frappe.get_attr("frappe.www.printview.get_rendered_raw_commands")(
+				doc="POS Closing Shift",
+				name=doc.name,
+				print_format=print_format.name,
+			)
+			raw_commands = raw_result.get("raw_commands")
+			if not raw_commands:
+				frappe.throw(_("Failed to render raw closing report print format"))
+			return {
+				"type": "raw",
+				"raw_commands": raw_commands,
+				"fallback_html": fallback_html,
+			}
+
+		result = frappe.get_attr("frappe.www.printview.get_html_and_style")(
+			doc="POS Closing Shift",
+			name=doc.name,
+			print_format=print_format.name,
+			no_letterhead=1,
+		)
+		html = result.get("html")
+		style = result.get("style") or ""
+		if not html:
+			frappe.throw(_("Failed to render closing report print format"))
+
+		return {
+			"type": "html",
+			"html": _build_print_format_document_html(doc, html, style),
+			"fallback_html": fallback_html,
+		}
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Closing Shift Print HTML Error")
+		frappe.throw(_("Error preparing closing shift report: {0}").format(str(e)))
+
+
+def _get_closing_report_print_format(pos_profile: str):
+	print_format_name = frappe.db.get_value(
+		"POS Settings",
+		{"pos_profile": pos_profile},
+		"closing_report_print_format",
+	)
+	if not print_format_name:
+		return None
+
+	print_format = frappe.get_doc("Print Format", print_format_name)
+	if print_format.disabled:
+		frappe.throw(_("Closing Report Print Format {0} is disabled").format(print_format_name))
+	if print_format.doc_type != "POS Closing Shift":
+		frappe.throw(_("Closing Report Print Format must be for POS Closing Shift"))
+
+	return print_format
+
+
+def _get_builtin_closing_shift_print_html(doc) -> str:
+	report_html = doc.get_payment_reconciliation_details()
+	return _build_closing_shift_print_html(doc, report_html)
+
+
+def _build_print_format_document_html(doc, html: str, style: str) -> str:
+	return f"""<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>{frappe.utils.escape_html(_('POS Closing Report - {0}').format(doc.name))}</title>
+	<style>{style}</style>
+</head>
+<body>{html}</body>
+</html>"""
+
+
+def _build_closing_shift_print_html(doc, report_html: str) -> str:
+	period_start = format_datetime(doc.period_start_date) if doc.period_start_date else ""
+	period_end = format_datetime(doc.period_end_date) if doc.period_end_date else ""
+
+	return f"""<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>{frappe.utils.escape_html(_('POS Closing Report - {0}').format(doc.name))}</title>
+	<style>
+		@page {{ size: 80mm auto; margin: 4mm; }}
+		* {{ box-sizing: border-box; }}
+		body {{
+			color: #111;
+			font-family: Arial, sans-serif;
+			font-size: 11px;
+			line-height: 1.35;
+			margin: 0 auto;
+			max-width: 80mm;
+			padding: 4mm;
+			width: 80mm;
+		}}
+		.header {{
+			border-bottom: 1px dashed #111;
+			margin-bottom: 10px;
+			padding-bottom: 8px;
+			text-align: center;
+		}}
+		.company {{ font-size: 15px; font-weight: 700; }}
+		.title {{ font-size: 12px; font-weight: 700; margin-top: 2px; }}
+		.meta {{
+			border-bottom: 1px dashed #111;
+			margin-bottom: 10px;
+			padding-bottom: 8px;
+		}}
+		.meta-row {{
+			display: flex;
+			justify-content: space-between;
+			gap: 8px;
+			margin: 2px 0;
+		}}
+		.meta-row span:first-child {{ font-weight: 700; }}
+		h6 {{
+			color: #111 !important;
+			font-size: 11px;
+			font-weight: 700;
+			margin: 10px 0 6px;
+			text-transform: uppercase;
+		}}
+		table {{
+			border-collapse: collapse;
+			margin-bottom: 8px;
+			width: 100%;
+		}}
+		th, td {{
+			border-bottom: 1px solid #ddd;
+			padding: 4px 0;
+			vertical-align: top;
+		}}
+		th {{ font-weight: 700; }}
+		.text-left {{ text-align: left; }}
+		.text-right {{ text-align: right; }}
+		.text-center {{ text-align: center; }}
+		.text-muted {{ color: #555; }}
+		.small {{ font-size: 9px; }}
+		.font-bold {{ font-weight: 700; }}
+		.box, .grid-body, .rows {{ width: 100%; }}
+		@media print {{
+			body {{ margin: 0; max-width: 80mm; padding: 0; width: 80mm; }}
+			.no-print {{ display: none; }}
+		}}
+	</style>
+</head>
+<body>
+	<div class="header">
+		<div class="company">{frappe.utils.escape_html(doc.company or '')}</div>
+		<div class="title">{frappe.utils.escape_html(_('POS Closing Report'))}</div>
+	</div>
+	<div class="meta">
+		<div class="meta-row"><span>{frappe.utils.escape_html(_('Closing Shift'))}</span><span>{frappe.utils.escape_html(doc.name)}</span></div>
+		<div class="meta-row"><span>{frappe.utils.escape_html(_('POS Profile'))}</span><span>{frappe.utils.escape_html(doc.pos_profile or '')}</span></div>
+		<div class="meta-row"><span>{frappe.utils.escape_html(_('Cashier'))}</span><span>{frappe.utils.escape_html(doc.user or '')}</span></div>
+		<div class="meta-row"><span>{frappe.utils.escape_html(_('Period Start'))}</span><span>{frappe.utils.escape_html(period_start)}</span></div>
+		<div class="meta-row"><span>{frappe.utils.escape_html(_('Period End'))}</span><span>{frappe.utils.escape_html(period_end)}</span></div>
+	</div>
+	{report_html}
+</body>
+</html>"""

@@ -363,6 +363,11 @@
 												:label="__('Silent Print')"
 												:description="__('Send receipts directly to a thermal printer via QZ Tray (no browser dialog)')"
 											/>
+											<CheckboxField
+												v-model="settings.print_closing_report"
+												:label="__('Print Closing Report')"
+												:description="__('Print the shift closing report after closing the POS shift')"
+											/>
 
 											<!-- QZ Tray Printer Settings (shown when silent print is enabled) -->
 											<div v-if="settings.silent_print" class="ps-6 flex flex-col gap-3 border-s-2 border-teal-200">
@@ -615,6 +620,7 @@ const settings = ref({
 	allow_write_off_change: 0,
 	allow_partial_payment: 0,
 	silent_print: 0,
+	print_closing_report: 0,
 	allow_negative_stock: 0,
 	tax_inclusive: 0,
 })

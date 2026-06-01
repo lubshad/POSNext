@@ -33,6 +33,19 @@ class POSSettings(Document):
 					"Please disable Partial Payment first."
 				)
 
+		self.validate_closing_report_print_format()
+
+	def validate_closing_report_print_format(self) -> None:
+		"""Validate the optional POS Closing Shift print format."""
+		if not self.closing_report_print_format:
+			return
+
+		print_format = frappe.get_doc("Print Format", self.closing_report_print_format)
+		if print_format.disabled:
+			frappe.throw("Closing Report Print Format cannot be disabled")
+		if print_format.doc_type != "POS Closing Shift":
+			frappe.throw("Closing Report Print Format must be for POS Closing Shift")
+
 	def on_update(self):
 		"""Sync allow_negative_stock with Stock Settings"""
 		self.sync_negative_stock_setting()
