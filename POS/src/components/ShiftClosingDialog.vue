@@ -486,6 +486,10 @@
             {{ __('✓ Shift closed successfully') }}
           </div>
 
+          <div v-if="eodPrintFailed" class="text-xs md:text-sm text-amber-600 font-medium text-center sm:text-end">
+            {{ __('EOD report pending print') }}
+          </div>
+
           <!-- Submit/Close button (only shown in entry mode) -->
           <Button
             v-if="!showSuccessReport"
@@ -496,6 +500,16 @@
             :disabled="!canSubmit"
           >
             {{ submitResource.loading ? __('Closing Shift...') : __('Close Shift') }}
+          </Button>
+
+          <Button
+            v-if="eodPrintFailed"
+            variant="solid"
+            theme="blue"
+            @click="retryEodPrint"
+            :loading="retryPrintLoading"
+          >
+            {{ __('Print EOD Report') }}
           </Button>
         </div>
       </div>
@@ -510,6 +524,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from "vue"
 import { storeToRefs } from "pinia"
 import { useShift, shiftState } from "../composables/useShift"
 import { useFormatters } from "../composables/useFormatters"
+import { useToast } from "../composables/useToast"
 import { usePOSSettingsStore } from "../stores/posSettings"
 import { usePOSShiftStore } from "../stores/posShift"
 import { printClosingReportWithFallback } from "../utils/printClosingReport"
@@ -535,8 +550,8 @@ const open = computed({
 })
 
 const { getClosingShiftData, submitClosingShift } = useShift()
-const { formatCurrency, formatQuantity, formatDateTime, formatTime } =
-	useFormatters()
+const { formatCurrency, formatQuantity, formatDateTime, formatTime } = useFormatters()
+const { showSuccess, showWarning } = useToast()
 const posSettingsStore = usePOSSettingsStore()
 const { hideExpectedAmount, printClosingReport, silentPrint } =
 	storeToRefs(posSettingsStore)
@@ -549,6 +564,8 @@ const submitResource = submitClosingShift
 const showInvoiceDetails = ref(false)
 const showSuccessReport = ref(false) // Track if shift is closed and showing report
 const errorMessage = ref('') // User-friendly error message
+const eodPrintFailed = ref(null)
+const retryPrintLoading = ref(false)
 const showIdleWarning = ref(false)
 let _idleWarningTimer = null
 
@@ -575,6 +592,7 @@ watch(open, async (isOpen) => {
 			clearTimeout(_idleWarningTimer)
 			_idleWarningTimer = null
 		}
+		eodPrintFailed.value = null
 	}
 })
 
@@ -673,13 +691,20 @@ async function submitClosing() {
 			submitResource.data?.name ||
 			submitResource.data?.message?.name
 
-		if (printClosingReport.value && closingShiftName) {
+		if (closingShiftName && printClosingReport.value) {
 			const printResult = await printClosingReportWithFallback(
 				closingShiftName,
 				silentPrint.value,
 			)
 			if (!printResult.success) {
 				console.warn("Closing report print failed")
+				showWarning(__("EOD report did not print. Use the Reprint button to retry."))
+				eodPrintFailed.value = { closingShiftName }
+				showSuccessReport.value = true
+				return
+			} else {
+				eodPrintFailed.value = null
+			}
 			}
 		}
 
@@ -701,6 +726,28 @@ async function submitClosing() {
 	}
 }
 
+async function retryEodPrint() {
+	const closingShiftName = eodPrintFailed.value?.closingShiftName
+	if (!closingShiftName) return
+
+	retryPrintLoading.value = true
+	try {
+		const printResult = await printClosingReportWithFallback(closingShiftName, silentPrint.value)
+		if (printResult.success) {
+			eodPrintFailed.value = null
+			showSuccess(__("EOD report printed successfully"))
+			closeDialog()
+		} else {
+			throw new Error("Print failed")
+		}
+	} catch (err) {
+		console.warn("[eod] retry print failed", err)
+		showWarning(__("EOD report did not print. Please check QZ Tray and retry."))
+	} finally {
+		retryPrintLoading.value = false
+	}
+}
+
 function closeDialog() {
 	// Emit shift-closed event if we're closing from success report
 	if (showSuccessReport.value) {
@@ -712,6 +759,7 @@ function closeDialog() {
 	showInvoiceDetails.value = false
 	showSuccessReport.value = false // Reset report view
 	errorMessage.value = '' // Clear error messages
+	eodPrintFailed.value = null
 }
 
 // UI State Computed Properties

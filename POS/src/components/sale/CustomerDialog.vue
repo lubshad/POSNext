@@ -184,7 +184,7 @@ import { useCustomerSearchStore } from "@/stores/customerSearch"
 import Dialog from "@/components/common/POSDialog.vue"
 import { Button } from "frappe-ui"
 import { storeToRefs } from "pinia"
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, ref, watch } from "vue"
 import CreateCustomerDialog from "./CreateCustomerDialog.vue"
 
 const props = defineProps({
@@ -278,7 +278,9 @@ function selectCustomer(customer) {
 	show.value = false
 }
 
-function createNewCustomer() {
+async function createNewCustomer() {
+	show.value = false
+	await nextTick()
 	showCreateDialog.value = true
 }
 
