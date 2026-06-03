@@ -705,7 +705,6 @@ async function submitClosing() {
 			} else {
 				eodPrintFailed.value = null
 			}
-			}
 		}
 
 		// If hideExpectedAmount is enabled, show success report before closing
