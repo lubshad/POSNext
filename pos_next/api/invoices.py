@@ -2233,7 +2233,7 @@ def prepare_return_invoice(invoice_name, pos_opening_shift=None):
     """
     from frappe.utils import date_diff, getdate
     from frappe.query_builder.functions import Sum, Abs, Coalesce
-    from erpnext.accounts.doctype.sales_invoice.sales_invoice import make_sales_return
+    from erpnext.accounts.doctype.sales_invoice.mapper import make_sales_return
 
     # Validate invoice and get fields needed for return period check
     si = frappe.qb.DocType("Sales Invoice")
