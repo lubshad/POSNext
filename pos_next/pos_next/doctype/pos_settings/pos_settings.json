@@ -233,10 +233,10 @@
   },
   {
    "default": "0",
+   "description": "When enabled, non-cash payments (card, bank transfer) require exact amount. Cash payments can still have change. Cannot be used with Credit Sale or Partial Payment.",
    "fieldname": "use_exact_amount",
    "fieldtype": "Check",
-   "label": "Use Exact Amount for Non-Cash",
-   "description": "When enabled, non-cash payments (card, bank transfer) require exact amount. Cash payments can still have change. Cannot be used with Credit Sale or Partial Payment."
+   "label": "Use Exact Amount for Non-Cash"
   },
   {
    "default": "Disabled",
@@ -345,11 +345,11 @@
   },
   {
    "default": "0",
+   "depends_on": "allow_return",
+   "description": "Number of days allowed for invoice returns. Set to 0 for unlimited returns.",
    "fieldname": "return_validity_days",
    "fieldtype": "Int",
-   "label": "Return Validity Days",
-   "description": "Number of days allowed for invoice returns. Set to 0 for unlimited returns.",
-   "depends_on": "allow_return"
+   "label": "Return Validity Days"
   },
   {
    "default": "0",
@@ -566,7 +566,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-01 17:51:09.000000",
+  "modified": "2026-06-03 15:54:09.903964",
  "modified_by": "Administrator",
  "module": "POS Next",
  "name": "POS Settings",
@@ -593,6 +593,17 @@
    "read": 1,
    "report": 1,
    "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Nexus POS Manager",
    "share": 1,
    "write": 1
   },
