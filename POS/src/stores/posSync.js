@@ -358,14 +358,17 @@ export const usePOSSyncStore = defineStore("posSync", () => {
 								),
 							)
 						: Promise.resolve(),
-					unpaidInvoices?.length > 0
-						? cacheUnpaidInvoices(unpaidInvoices, currentProfile.name).then(
-								() =>
-									log.success(
-										`Cached ${unpaidInvoices.length} unpaid invoices for offline viewing`,
-									),
-							)
-						: Promise.resolve(),
+					cacheUnpaidInvoices(unpaidInvoices || [], currentProfile.name).then(
+						() => {
+							if (unpaidInvoices?.length > 0) {
+								log.success(
+									`Cached ${unpaidInvoices.length} unpaid invoices for offline viewing`,
+								)
+							} else {
+								log.debug("Cleared unpaid invoices cache")
+							}
+						},
+					),
 					unpaidSummary
 						? cacheUnpaidSummary(unpaidSummary, currentProfile.name).then(() =>
 								log.debug("Cached unpaid invoice summary"),
