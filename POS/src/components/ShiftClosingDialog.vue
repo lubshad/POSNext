@@ -550,7 +550,8 @@ const open = computed({
 })
 
 const { getClosingShiftData, submitClosingShift } = useShift()
-const { formatCurrency, formatQuantity, formatDateTime, formatTime } = useFormatters()
+const { formatCurrency, formatQuantity, formatDateTime, formatTime } =
+	useFormatters()
 const { showSuccess, showWarning } = useToast()
 const posSettingsStore = usePOSSettingsStore()
 const { hideExpectedAmount, printClosingReport, silentPrint } =
@@ -563,7 +564,7 @@ const closingDataResource = getClosingShiftData
 const submitResource = submitClosingShift
 const showInvoiceDetails = ref(false)
 const showSuccessReport = ref(false) // Track if shift is closed and showing report
-const errorMessage = ref('') // User-friendly error message
+const errorMessage = ref("") // User-friendly error message
 const eodPrintFailed = ref(null)
 const retryPrintLoading = ref(false)
 const showIdleWarning = ref(false)
@@ -606,7 +607,7 @@ onBeforeUnmount(() => {
 
 async function loadClosingData() {
 	try {
-		errorMessage.value = '' // Clear any previous errors
+		errorMessage.value = "" // Clear any previous errors
 
 		const data = await closingDataResource.submit({
 			opening_shift: props.openingShift,
@@ -637,7 +638,8 @@ async function loadClosingData() {
 		}
 	} catch (error) {
 		console.error("Error loading closing data:", error)
-		errorMessage.value = 'Unable to load shift data. Please check your connection and try again.'
+		errorMessage.value =
+			"Unable to load shift data. Please check your connection and try again."
 	}
 }
 
@@ -672,7 +674,7 @@ async function submitClosing() {
 	if (!closingData.value) return
 
 	try {
-		errorMessage.value = '' // Clear any previous errors
+		errorMessage.value = "" // Clear any previous errors
 
 		// Ensure all differences are calculated
 		if (closingData.value.payment_reconciliation) {
@@ -698,7 +700,9 @@ async function submitClosing() {
 			)
 			if (!printResult.success) {
 				console.warn("Closing report print failed")
-				showWarning(__("EOD report did not print. Use the Reprint button to retry."))
+				showWarning(
+					__("EOD report did not print. Use the Reprint button to retry."),
+				)
 				eodPrintFailed.value = { closingShiftName }
 				showSuccessReport.value = true
 				return
@@ -721,7 +725,8 @@ async function submitClosing() {
 		}
 	} catch (error) {
 		console.error("Error submitting closing shift:", error)
-		errorMessage.value = 'Failed to close shift. Please verify all amounts and try again.'
+		errorMessage.value =
+			"Failed to close shift. Please verify all amounts and try again."
 	}
 }
 
@@ -731,7 +736,10 @@ async function retryEodPrint() {
 
 	retryPrintLoading.value = true
 	try {
-		const printResult = await printClosingReportWithFallback(closingShiftName, silentPrint.value)
+		const printResult = await printClosingReportWithFallback(
+			closingShiftName,
+			silentPrint.value,
+		)
 		if (printResult.success) {
 			eodPrintFailed.value = null
 			showSuccess(__("EOD report printed successfully"))
@@ -757,27 +765,27 @@ function closeDialog() {
 	closingData.value = null
 	showInvoiceDetails.value = false
 	showSuccessReport.value = false // Reset report view
-	errorMessage.value = '' // Clear error messages
+	errorMessage.value = "" // Clear error messages
 	eodPrintFailed.value = null
 }
 
 // UI State Computed Properties
-const shouldShowSummary = computed(() =>
-	!hideExpectedAmount.value || showSuccessReport.value
+const shouldShowSummary = computed(
+	() => !hideExpectedAmount.value || showSuccessReport.value,
 )
 
-const isInEntryMode = computed(() =>
-	hideExpectedAmount.value && !showSuccessReport.value
+const isInEntryMode = computed(
+	() => hideExpectedAmount.value && !showSuccessReport.value,
 )
 
 const reconciliationMessage = computed(() => {
 	if (isInEntryMode.value) {
-		return 'Enter the actual counted amounts for each payment method'
+		return "Enter the actual counted amounts for each payment method"
 	}
 	if (showSuccessReport.value && hideExpectedAmount.value) {
-		return 'Shift closed successfully - Review the final reconciliation below'
+		return "Shift closed successfully - Review the final reconciliation below"
 	}
-	return 'Count your cash and enter actual amounts below'
+	return "Count your cash and enter actual amounts below"
 })
 
 // Computed properties for real-time recalculation
@@ -797,7 +805,7 @@ const hasReturns = computed(() => {
 const salesInvoiceCount = computed(() => {
 	if (!closingData.value) return 0
 	const transactions = closingData.value.pos_transactions || []
-	return transactions.filter(t => !t.is_return).length
+	return transactions.filter((t) => !t.is_return).length
 })
 
 const totalTax = computed(() => {
@@ -840,7 +848,8 @@ function getSalesForPayment(payment) {
 }
 
 function getShiftDuration() {
-	if (!closingData.value || !closingData.value.period_start_date) return __("N/A")
+	if (!closingData.value || !closingData.value.period_start_date)
+		return __("N/A")
 
 	// Use the same timezone-safe approach as the header timer
 	const { _initialElapsedMs, _receivedAt } = shiftState.value
@@ -852,13 +861,13 @@ function getShiftDuration() {
 	const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
 
 	if (days > 0) {
-		const dayLabel = days === 1 ? __('Day') : __('Days')
-		return __('{0} {1} {2}h {3}m', [days, dayLabel, hours, minutes])
+		const dayLabel = days === 1 ? __("Day") : __("Days")
+		return __("{0} {1} {2}h {3}m", [days, dayLabel, hours, minutes])
 	}
 	if (hours > 0) {
-		return __('{0}h {1}m', [hours, minutes])
+		return __("{0}h {1}m", [hours, minutes])
 	}
-	return __('{0}m', [minutes])
+	return __("{0}m", [minutes])
 }
 
 function getPaymentIcon(method) {

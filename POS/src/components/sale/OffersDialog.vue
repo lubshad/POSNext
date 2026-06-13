@@ -200,7 +200,11 @@
 
 <script setup>
 import { usePOSOffersStore } from "@/stores/posOffers"
-import { DEFAULT_CURRENCY, DEFAULT_LOCALE, formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import {
+	DEFAULT_CURRENCY,
+	DEFAULT_LOCALE,
+	formatCurrency as formatCurrencyUtil,
+} from "@/utils/currency"
 import Dialog from "@/components/common/POSDialog.vue"
 import { Button } from "frappe-ui"
 import { computed, ref, watch } from "vue"
