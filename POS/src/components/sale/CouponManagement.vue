@@ -722,7 +722,6 @@ const campaignsResource = createResource({
 		return {
 			doctype: "Campaign",
 			fields: ["name"],
-			filters: { disabled: 0 },
 			limit_page_length: 999,
 		}
 	},
