@@ -1902,10 +1902,16 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 			})
 
 			const list = items?.message || items || []
-			const updatedItem = list.find((item) => item.item_code === itemCode) || list[0]
+			const updatedItem =
+				list.find((item) => item.item_code === itemCode) || list[0]
 			if (!updatedItem) return null
 
-			upsertItemInList(allItems, allItemsVersion, registeredAllItems, updatedItem)
+			upsertItemInList(
+				allItems,
+				allItemsVersion,
+				registeredAllItems,
+				updatedItem,
+			)
 			upsertItemInList(
 				searchResults,
 				searchResultsVersion,
