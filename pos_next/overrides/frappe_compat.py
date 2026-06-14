@@ -137,16 +137,13 @@ class LegacyPOSSettingsDocument(frappe.model.document.Document):
 			"name": "POS Settings",
 			"invoice_type": "Sales Invoice",
 			"post_change_gl_entries": 0,
-			"invoice_fields": [],
-			"pos_search_fields": [],
 		})
 		self.__dict__.update({
 			"invoice_type": "Sales Invoice",
 			"post_change_gl_entries": 0,
-			"invoice_fields": [],
-			"pos_search_fields": [],
 		})
 		self._load_from_singles()
+		self._load_child_tables()
 
 	def _load_from_singles(self):
 		for field in ("invoice_type", "post_change_gl_entries"):
@@ -154,6 +151,44 @@ class LegacyPOSSettingsDocument(frappe.model.document.Document):
 			if val is not None:
 				setattr(self, field, val)
 				self.__dict__[field] = val
+
+	def _load_child_tables(self):
+		self.set(
+			"invoice_fields",
+			frappe.get_all(
+				"POS Field",
+				filters={
+					"parent": "POS Settings",
+					"parenttype": "POS Settings",
+					"parentfield": "invoice_fields",
+				},
+				fields=[
+					"name",
+					"idx",
+					"fieldname",
+					"label",
+					"fieldtype",
+					"options",
+					"default_value",
+					"reqd",
+					"read_only",
+				],
+				order_by="idx asc",
+			)
+		)
+		self.set(
+			"pos_search_fields",
+			frappe.get_all(
+				"POS Search Fields",
+				filters={
+					"parent": "POS Settings",
+					"parenttype": "POS Settings",
+					"parentfield": "pos_search_fields",
+				},
+				fields=["name", "idx", "field", "fieldname"],
+				order_by="idx asc",
+			)
+		)
 
 	def get_valid_dict(self, *args, **kwargs):
 		d = super().get_valid_dict(*args, **kwargs)
