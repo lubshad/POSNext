@@ -55,3 +55,10 @@ try:
     patch_round_floats_in_compat(document_module)
 except Exception:
     pass
+
+# Patch POS Settings get_single_value for compatibility
+try:
+    from pos_next.overrides.frappe_compat import patch_pos_settings_singles_compat
+    patch_pos_settings_singles_compat()
+except Exception:
+    pass
