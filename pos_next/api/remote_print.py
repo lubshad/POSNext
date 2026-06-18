@@ -60,9 +60,8 @@ def _is_online(last_seen) -> bool:
 
 def _normalize_allowed_types(
 	allowed_types: Any = None,
-	printer_type: str | None = None,
 ) -> list[str]:
-	"""Normalize allowed printer types from new or legacy API input."""
+	"""Normalize allowed printer types from API input."""
 	if isinstance(allowed_types, str):
 		value = allowed_types.strip()
 		if value.startswith("["):
@@ -72,8 +71,6 @@ def _normalize_allowed_types(
 		else:
 			allowed_types = []
 
-	if not allowed_types and printer_type:
-		allowed_types = [printer_type]
 	if not allowed_types:
 		allowed_types = ["General"]
 
@@ -93,7 +90,39 @@ def _set_allowed_types(doc, allowed_types: list[str]) -> None:
 	doc.set("allowed_types", [])
 	for allowed_type in allowed_types:
 		doc.append("allowed_types", {"allowed_type": allowed_type})
-	doc.printer_type = allowed_types[0] if allowed_types else "General"
+
+
+def _normalize_pos_profiles(pos_profiles: Any = None) -> list[str]:
+	"""Normalize POS Profile scope input. Empty means visible to all profiles."""
+	if isinstance(pos_profiles, str):
+		value = pos_profiles.strip()
+		if value.startswith("["):
+			pos_profiles = json.loads(value)
+		elif value:
+			pos_profiles = [item.strip() for item in value.split(",")]
+		else:
+			pos_profiles = []
+
+	if not pos_profiles:
+		return []
+
+	normalized = []
+	for value in pos_profiles:
+		if isinstance(value, dict):
+			value = value.get("pos_profile")
+		if not value:
+			continue
+		if not frappe.db.exists("POS Profile", value):
+			frappe.throw(_("POS Profile {0} does not exist").format(value))
+		if value not in normalized:
+			normalized.append(value)
+	return normalized
+
+
+def _set_pos_profiles(doc, pos_profiles: list[str]) -> None:
+	doc.set("pos_profiles", [])
+	for pos_profile in pos_profiles:
+		doc.append("pos_profiles", {"pos_profile": pos_profile})
 
 
 def _batch_allowed_types(printer_names: list[str]) -> dict[str, list[str]]:
@@ -115,10 +144,43 @@ def _batch_allowed_types(printer_names: list[str]) -> dict[str, list[str]]:
 	return allowed_by_parent
 
 
+def _batch_pos_profiles(printer_names: list[str]) -> dict[str, list[str]]:
+	if not printer_names:
+		return {}
+
+	rows = frappe.get_all(
+		"POS Remote Printer POS Profile",
+		filters={"parent": ["in", printer_names], "parenttype": DOCTYPE_REMOTE_PRINTER},
+		fields=["parent", "pos_profile", "idx"],
+		order_by="parent asc, idx asc",
+	)
+
+	profiles_by_parent: dict[str, list[str]] = {name: [] for name in printer_names}
+	for row in rows:
+		if row.pos_profile and row.pos_profile not in profiles_by_parent[row.parent]:
+			profiles_by_parent[row.parent].append(row.pos_profile)
+
+	return profiles_by_parent
+
+
 def _printer_allows_type(allowed_types: list[str], requested_type: str | None) -> bool:
 	if not requested_type:
 		return True
 	return "General" in allowed_types or requested_type in allowed_types
+
+
+def _printer_visible_for_profile(assigned_profiles: list[str], requested_profile: str | None) -> bool:
+	if not assigned_profiles:
+		return True
+	return bool(requested_profile and requested_profile in assigned_profiles)
+
+
+def _get_reference_pos_profile(job_type: str, reference_doctype: str, reference_name: str) -> str | None:
+	if job_type == "Closing Report" and reference_doctype == "POS Closing Shift":
+		return frappe.db.get_value("POS Closing Shift", reference_name, "pos_profile")
+	if job_type == "Invoice" and reference_doctype in {"Sales Invoice", "POS Invoice"}:
+		return frappe.db.get_value(reference_doctype, reference_name, "pos_profile")
+	return None
 
 
 def _validate_pos_profile_access(pos_profile: str | None) -> None:
@@ -162,9 +224,8 @@ def register_remote_printer(
 	printer_name: str,
 	qz_printer_name: str,
 	hub_id: str,
-	printer_type: str = "General",
 	allowed_types: Any = None,
-	pos_profile: str | None = None,
+	pos_profiles: Any = None,
 ):
 	"""Create or update a shared remote printer owned by ``hub_id``.
 
@@ -175,11 +236,8 @@ def register_remote_printer(
 	if not printer_name or not qz_printer_name or not hub_id:
 		frappe.throw(_("printer_name, qz_printer_name and hub_id are required"))
 
-	normalized_allowed_types = _normalize_allowed_types(allowed_types, printer_type)
-
-	# Remote printers are device resources, not POS Profile resources. Keep the
-	# field empty so newly-created POS Profiles can discover existing printers.
-	pos_profile = None
+	normalized_allowed_types = _normalize_allowed_types(allowed_types)
+	normalized_pos_profiles = _normalize_pos_profiles(pos_profiles)
 
 	existing_name = frappe.db.get_value(
 		DOCTYPE_REMOTE_PRINTER,
@@ -192,7 +250,7 @@ def register_remote_printer(
 		doc = frappe.get_doc(DOCTYPE_REMOTE_PRINTER, existing_name)
 		doc.printer_name = printer_name
 		_set_allowed_types(doc, normalized_allowed_types)
-		doc.pos_profile = pos_profile
+		_set_pos_profiles(doc, normalized_pos_profiles)
 		doc.enabled = 1
 		doc.last_seen = now
 		doc.flags.ignore_permissions = True
@@ -204,11 +262,12 @@ def register_remote_printer(
 				"printer_name": printer_name,
 				"hub_id": hub_id,
 				"qz_printer_name": qz_printer_name,
-				"printer_type": normalized_allowed_types[0],
 				"allowed_types": [
 					{"allowed_type": allowed_type} for allowed_type in normalized_allowed_types
 				],
-				"pos_profile": pos_profile,
+				"pos_profiles": [
+					{"pos_profile": pos_profile} for pos_profile in normalized_pos_profiles
+				],
 				"enabled": 1,
 				"last_seen": now,
 			}
@@ -221,8 +280,8 @@ def register_remote_printer(
 		"name": doc.name,
 		"printer_name": doc.printer_name,
 		"hub_id": doc.hub_id,
-		"printer_type": doc.printer_type,
 		"allowed_types": normalized_allowed_types,
+		"pos_profiles": normalized_pos_profiles,
 	}
 
 
@@ -291,7 +350,7 @@ def unregister_remote_printer(hub_id: str, qz_printer_name: str | None = None):
 @frappe.whitelist()
 def list_remote_printers(
 	pos_profile: str | None = None,
-	printer_type: str | None = None,
+	allowed_type: str | None = None,
 	include_offline: int = 0,
 ):
 	"""Return remote printers available for the current user.
@@ -299,14 +358,11 @@ def list_remote_printers(
 	Printers are visible when:
       - ``enabled`` is set
       - ``last_seen`` is within the heartbeat window (unless include_offline)
-
-	``pos_profile`` is accepted for API compatibility but remote printers are
-	listed globally. The selected defaults remain stored per POS Profile in
-	``POS Settings``.
+	  - profile scope is empty or contains the requested ``pos_profile``
 	"""
-	requested_type = printer_type or None
+	requested_type = allowed_type or None
 	if requested_type not in (None, *VALID_PRINTER_TYPES):
-		frappe.throw(_("Invalid printer_type: {0}").format(requested_type))
+		frappe.throw(_("Invalid allowed_type: {0}").format(requested_type))
 
 	filters = {"enabled": 1}
 
@@ -318,8 +374,6 @@ def list_remote_printers(
 			"printer_name",
 			"hub_id",
 			"qz_printer_name",
-			"printer_type",
-			"pos_profile",
 			"enabled",
 			"last_seen",
 		],
@@ -328,16 +382,20 @@ def list_remote_printers(
 
 	result = []
 	allowed_by_parent = _batch_allowed_types([p.name for p in printers])
+	profiles_by_parent = _batch_pos_profiles([p.name for p in printers])
 	for p in printers:
-		allowed_types = allowed_by_parent.get(p.name) or _normalize_allowed_types(printer_type=p.get("printer_type"))
+		allowed_types = allowed_by_parent.get(p.name) or ["General"]
 		if not _printer_allows_type(allowed_types, requested_type):
+			continue
+		assigned_profiles = profiles_by_parent.get(p.name) or []
+		if pos_profile and not _printer_visible_for_profile(assigned_profiles, pos_profile):
 			continue
 		online = _is_online(p.get("last_seen"))
 		if not include_offline and not online:
 			continue
 		p["online"] = online
 		p["allowed_types"] = allowed_types
-		p["printer_type"] = allowed_types[0] if allowed_types else p.get("printer_type")
+		p["pos_profiles"] = assigned_profiles
 		result.append(p)
 
 	return result
@@ -370,7 +428,7 @@ def create_remote_print_job(
 	printer = frappe.db.get_value(
 		DOCTYPE_REMOTE_PRINTER,
 		remote_printer,
-		["name", "hub_id", "enabled", "printer_type", "pos_profile", "last_seen"],
+		["name", "hub_id", "enabled", "last_seen"],
 		as_dict=True,
 	)
 	if not printer:
@@ -380,9 +438,7 @@ def create_remote_print_job(
 	if not _is_online(printer.last_seen):
 		frappe.throw(_("Remote printer {0} is offline").format(remote_printer))
 
-	allowed_types = _batch_allowed_types([remote_printer]).get(remote_printer) or _normalize_allowed_types(
-		printer_type=printer.printer_type
-	)
+	allowed_types = _batch_allowed_types([remote_printer]).get(remote_printer) or ["General"]
 	requested_type = JOB_TO_PRINTER_TYPE.get(job_type)
 	if not _printer_allows_type(allowed_types, requested_type):
 		frappe.throw(_("Remote printer {0} does not allow {1} jobs").format(remote_printer, job_type))
@@ -390,6 +446,11 @@ def create_remote_print_job(
 	# Validate the caller can read the referenced document.
 	if not frappe.has_permission(reference_doctype, "read", reference_name):
 		frappe.throw(_("You do not have access to {0} {1}").format(reference_doctype, reference_name))
+
+	requested_profile = _get_reference_pos_profile(job_type, reference_doctype, reference_name)
+	assigned_profiles = _batch_pos_profiles([remote_printer]).get(remote_printer) or []
+	if not _printer_visible_for_profile(assigned_profiles, requested_profile):
+		frappe.throw(_("Remote printer {0} is not available for POS Profile {1}").format(remote_printer, requested_profile))
 
 	job = frappe.get_doc(
 		{
@@ -415,8 +476,8 @@ def create_remote_print_job(
 			"reference_name": job.reference_name,
 			"remote_printer": remote_printer,
 			"hub_id": printer.hub_id,
-			"printer_type": allowed_types[0] if allowed_types else printer.printer_type,
 			"allowed_types": allowed_types,
+			"pos_profiles": assigned_profiles,
 			"requested_by": frappe.session.user,
 			"timestamp": frappe.utils.now(),
 		},
@@ -491,7 +552,7 @@ def get_remote_print_job_payload(job_name: str):
 	printer = frappe.db.get_value(
 		DOCTYPE_REMOTE_PRINTER,
 		job.remote_printer,
-		["qz_printer_name", "pos_profile"],
+		["qz_printer_name"],
 		as_dict=True,
 	)
 

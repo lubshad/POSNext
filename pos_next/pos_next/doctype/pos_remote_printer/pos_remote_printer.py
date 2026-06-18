@@ -13,14 +13,14 @@ class POSRemotePrinter(Document):
 
 	if TYPE_CHECKING:
 		from pos_next.pos_next.doctype.pos_remote_printer_allowed_type.pos_remote_printer_allowed_type import POSRemotePrinterAllowedType
+		from pos_next.pos_next.doctype.pos_remote_printer_pos_profile.pos_remote_printer_pos_profile import POSRemotePrinterPOSProfile
 		from frappe.types import DF
 
 		allowed_types: DF.Table[POSRemotePrinterAllowedType]
+		pos_profiles: DF.Table[POSRemotePrinterPOSProfile]
 		printer_name: DF.Data | None
 		hub_id: DF.Data | None
 		qz_printer_name: DF.Data | None
-		printer_type: DF.Literal["Receipt", "Closing Report", "General"]
-		pos_profile: DF.Link | None
 		enabled: DF.Check
 		last_seen: DF.Datetime | None
 	# end: auto-generated types

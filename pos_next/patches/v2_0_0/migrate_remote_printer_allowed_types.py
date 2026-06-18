@@ -9,6 +9,8 @@ def execute() -> None:
 
 	if not frappe.db.exists("DocType", "POS Remote Printer Allowed Type"):
 		return
+	if not frappe.db.has_column("POS Remote Printer", "printer_type"):
+		return
 
 	printers = frappe.get_all(
 		"POS Remote Printer",

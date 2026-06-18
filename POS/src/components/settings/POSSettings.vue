@@ -408,8 +408,8 @@
 												</div>
 
 												<!-- Printer Selection -->
-												<div class="flex items-end gap-2">
-													<div class="flex-1">
+											<div class="flex items-end gap-2">
+												<div class="flex-1">
 														<SelectField
 															v-model="selectedPrinter"
 															:label="__('Printer')"
@@ -659,8 +659,8 @@
 																:placeholder="__('Display name for other users')"
 																class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
 															/>
-														</div>
-													<div class="flex flex-wrap gap-2 mb-0.5">
+												</div>
+											<div class="flex flex-wrap gap-2 mb-0.5">
 														<label
 															v-for="option in printerTypeOptions"
 															:key="option.value"
@@ -674,8 +674,27 @@
 															/>
 															<span>{{ option.label }}</span>
 														</label>
-													</div>
-														<button
+											</div>
+											<div class="w-full flex flex-col gap-1">
+												<div class="text-xs font-medium text-gray-700">{{ __('POS Profiles') }}</div>
+												<p class="text-[11px] text-gray-500">{{ __('Leave empty to share this printer across all POS Profiles.') }}</p>
+												<div class="flex flex-wrap gap-2">
+													<label
+														v-for="option in posProfileOptions"
+														:key="option.value"
+														class="flex items-center gap-1.5 px-2.5 py-2 text-xs border border-gray-300 rounded-md bg-white text-gray-700 cursor-pointer hover:bg-gray-50"
+													>
+														<input
+															type="checkbox"
+															:checked="newSharedPrinter.pos_profiles.includes(option.value)"
+															class="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+															@change="toggleSharedPrinterProfile(option.value)"
+														/>
+														<span>{{ option.label }}</span>
+													</label>
+												</div>
+											</div>
+												<button
 															@click="handleRegisterSharedPrinter"
 													:disabled="!newSharedPrinter.qz_name || !newSharedPrinter.display_name || newSharedPrinter.allowed_types.length === 0 || registeringPrinter"
 															class="px-3 py-2 mb-0.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 rounded-md transition-colors whitespace-nowrap"
@@ -695,7 +714,8 @@
 														<div class="flex items-center gap-2 min-w-0">
 															<span class="w-1.5 h-1.5 rounded-full flex-shrink-0" :class="p.online ? 'bg-green-500' : 'bg-gray-400'"></span>
 															<span class="text-xs font-medium text-gray-800 truncate">{{ p.printer_name }}</span>
-															<span class="text-[10px] text-gray-500 px-1.5 py-0.5 bg-gray-200 rounded-full flex-shrink-0">{{ formatAllowedTypes(p) }}</span>
+													<span class="text-[10px] text-gray-500 px-1.5 py-0.5 bg-gray-200 rounded-full flex-shrink-0">{{ formatAllowedTypes(p) }}</span>
+													<span class="text-[10px] text-gray-500 px-1.5 py-0.5 bg-amber-100 rounded-full flex-shrink-0">{{ formatPOSProfiles(p) }}</span>
 														</div>
 														<button
 															@click="handleUnregisterPrinter(p)"
@@ -838,10 +858,12 @@ const remotePrinters = ref([])
 const remotePrintersLoading = ref(false)
 const sharedPrintersList = ref([])
 const registeringPrinter = ref(false)
+const posProfileOptions = ref([])
 const newSharedPrinter = ref({
 	qz_name: "",
 	display_name: "",
 	allowed_types: ["Receipt"],
+	pos_profiles: [],
 })
 
 const printerTypeOptions = [
@@ -872,7 +894,7 @@ function printerAllowedTypes(printer) {
 	if (Array.isArray(printer?.allowed_types) && printer.allowed_types.length > 0) {
 		return printer.allowed_types
 	}
-	return printer?.printer_type ? [printer.printer_type] : ["General"]
+	return ["General"]
 }
 
 function printerAllowsType(printer, printerType) {
@@ -884,11 +906,46 @@ function formatAllowedTypes(printer) {
 	return printerAllowedTypes(printer).join(", ")
 }
 
+function printerPOSProfiles(printer) {
+	if (Array.isArray(printer?.pos_profiles) && printer.pos_profiles.length > 0) {
+		return printer.pos_profiles
+	}
+	return []
+}
+
+function formatPOSProfiles(printer) {
+	const profiles = printerPOSProfiles(printer)
+	return profiles.length > 0 ? profiles.join(", ") : __("All Profiles")
+}
+
 function toggleSharedPrinterType(printerType) {
 	const current = newSharedPrinter.value.allowed_types
 	newSharedPrinter.value.allowed_types = current.includes(printerType)
 		? current.filter((value) => value !== printerType)
 		: [...current, printerType]
+}
+
+function toggleSharedPrinterProfile(posProfile) {
+	const current = newSharedPrinter.value.pos_profiles
+	newSharedPrinter.value.pos_profiles = current.includes(posProfile)
+		? current.filter((value) => value !== posProfile)
+		: [...current, posProfile]
+}
+
+async function loadPOSProfileOptions() {
+	try {
+		const data = await call("pos_next.api.shifts.get_opening_dialog_data")
+		const profiles = data?.message?.pos_profiles_data || data?.pos_profiles_data || []
+		posProfileOptions.value = profiles.map((profile) => ({
+			label: profile.name,
+			value: profile.name,
+		}))
+	} catch (error) {
+		log.warn("Failed to load POS profiles for remote printer scope:", error?.message || error)
+		posProfileOptions.value = props.posProfile
+			? [{ label: props.posProfile, value: props.posProfile }]
+			: []
+	}
 }
 
 async function loadRemotePrinters() {
@@ -923,14 +980,14 @@ async function handleRegisterSharedPrinter() {
 			printerName: newSharedPrinter.value.display_name,
 			qzPrinterName: newSharedPrinter.value.qz_name,
 			allowedTypes: newSharedPrinter.value.allowed_types,
-			printerType: newSharedPrinter.value.allowed_types[0],
-			posProfile: "",
+			posProfiles: newSharedPrinter.value.pos_profiles,
 		})
 		sharedPrintersList.value = remotePrintStore.sharedPrinters
 		newSharedPrinter.value = {
 			qz_name: "",
 			display_name: "",
 			allowed_types: ["Receipt"],
+			pos_profiles: [],
 		}
 		showSuccess(__("Printer shared successfully"))
 	} catch (error) {
@@ -1104,6 +1161,7 @@ async function loadSettings() {
 
 		// Load settings
 		settingsResource.reload()
+		loadPOSProfileOptions()
 
 		// Load remote printers for selection (non-blocking)
 		if (settings.value.enable_remote_printing) {

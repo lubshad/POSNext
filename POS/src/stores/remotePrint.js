@@ -114,15 +114,13 @@ export const useRemotePrintStore = defineStore("remotePrint", () => {
 	 * @param {string} params.printerName - Display name for other users
 	 * @param {string} params.qzPrinterName - Actual system printer name
 	 * @param {string[]} params.allowedTypes - Receipt | Closing Report | General
-	 * @param {string} params.printerType - Legacy fallback type
-	 * @param {string} params.posProfile - Optional POS Profile to limit visibility
+	 * @param {string[]} params.posProfiles - Optional POS Profiles to limit visibility
 	 */
 	async function registerPrinter({
 		printerName,
 		qzPrinterName,
 		allowedTypes,
-		printerType,
-		posProfile,
+		posProfiles,
 	}) {
 		try {
 			const result = await call(
@@ -131,9 +129,8 @@ export const useRemotePrintStore = defineStore("remotePrint", () => {
 					printer_name: printerName,
 					qz_printer_name: qzPrinterName,
 					hub_id: hubId.value,
-					allowed_types: allowedTypes || [printerType || "General"],
-					printer_type: printerType || "General",
-					pos_profile: posProfile || "",
+					allowed_types: allowedTypes || ["General"],
+					pos_profiles: posProfiles || [],
 				},
 			)
 			log.info(`Registered remote printer: ${printerName}`)
@@ -385,16 +382,16 @@ export const useRemotePrintStore = defineStore("remotePrint", () => {
 	/**
 	 * Fetch available remote printers for selection.
 	 * @param {string} posProfile - Current POS Profile (for scoping)
-	 * @param {string} [printerType] - Optional filter by type
+	 * @param {string} [allowedType] - Optional filter by type
 	 */
-	async function loadAvailablePrinters(posProfile, printerType = null) {
+	async function loadAvailablePrinters(posProfile, allowedType = null) {
 		isLoadingPrinters.value = true
 		try {
 			const result = await call(
 				"pos_next.api.remote_print.list_remote_printers",
 				{
 					pos_profile: posProfile || "",
-					printer_type: printerType || "",
+					allowed_type: allowedType || "",
 					include_offline: 1,
 				},
 			)
