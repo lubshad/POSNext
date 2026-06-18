@@ -66,12 +66,16 @@ export async function browserPrintClosingReport(closingShiftName) {
 	return openBrowserPrintWindow(html)
 }
 
-export async function silentPrintClosingReport(payload, closingShiftName) {
+export async function silentPrintClosingReport(
+	payload,
+	closingShiftName,
+	printerName = null,
+) {
 	if (payload.type === "raw") {
 		if (!payload.raw_commands) {
 			throw new Error(__("Raw closing report commands are missing"))
 		}
-		await qzPrintRawCommands(payload.raw_commands)
+		await qzPrintRawCommands(payload.raw_commands, printerName)
 		log.info(`Raw silent closing report print sent for ${closingShiftName}`)
 		return true
 	}
@@ -79,7 +83,7 @@ export async function silentPrintClosingReport(payload, closingShiftName) {
 	if (!payload.html) {
 		throw new Error(__("Closing report HTML is missing"))
 	}
-	await qzPrintHTML(payload.html)
+	await qzPrintHTML(payload.html, printerName)
 	log.info(`Silent closing report print sent for ${closingShiftName}`)
 	return true
 }
@@ -87,12 +91,13 @@ export async function silentPrintClosingReport(payload, closingShiftName) {
 export async function printClosingReportWithFallback(
 	closingShiftName,
 	silentPrintEnabled = false,
+	printerName = null,
 ) {
 	const payload = await getClosingReportPayload(closingShiftName)
 
 	if (silentPrintEnabled) {
 		try {
-			await silentPrintClosingReport(payload, closingShiftName)
+			await silentPrintClosingReport(payload, closingShiftName, printerName)
 			return { method: "silent", success: true }
 		} catch (error) {
 			log.warn(

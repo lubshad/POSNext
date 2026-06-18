@@ -55,6 +55,13 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 		silent_print: 0,
 		print_closing_report: 0,
 		closing_report_print_format: "",
+		// Remote Printing
+		enable_remote_printing: 0,
+		share_printers_remotely: 0,
+		remote_print_invoices: 0,
+		remote_print_closing_reports: 0,
+		default_invoice_remote_printer: "",
+		default_closing_report_remote_printer: "",
 		// Delivery
 		use_delivery_charges: 0,
 		auto_set_delivery_charges: 0,
@@ -199,6 +206,26 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 	const silentPrint = computed(() => Boolean(settings.value.silent_print))
 	const printClosingReport = computed(() =>
 		Boolean(settings.value.print_closing_report),
+	)
+
+	// Computed - Remote Printing
+	const enableRemotePrinting = computed(() =>
+		Boolean(settings.value.enable_remote_printing),
+	)
+	const sharePrintersRemotely = computed(() =>
+		Boolean(settings.value.share_printers_remotely),
+	)
+	const remotePrintInvoices = computed(() =>
+		Boolean(settings.value.remote_print_invoices),
+	)
+	const remotePrintClosingReports = computed(() =>
+		Boolean(settings.value.remote_print_closing_reports),
+	)
+	const defaultInvoiceRemotePrinter = computed(
+		() => settings.value.default_invoice_remote_printer || "",
+	)
+	const defaultClosingReportRemotePrinter = computed(
+		() => settings.value.default_closing_report_remote_printer || "",
 	)
 
 	// Computed - Delivery
@@ -390,7 +417,7 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 	 * @returns {boolean} - True if stock validation should prevent negative stock
 	 */
 	function shouldEnforceStockValidation() {
-		return isEnabled.value && !Boolean(settings.value.allow_negative_stock)
+		return isEnabled.value && !settings.value.allow_negative_stock
 	}
 
 	/**
@@ -473,6 +500,14 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 		allowPrintLastInvoice,
 		silentPrint,
 		printClosingReport,
+
+		// Computed - Remote Printing
+		enableRemotePrinting,
+		sharePrintersRemotely,
+		remotePrintInvoices,
+		remotePrintClosingReports,
+		defaultInvoiceRemotePrinter,
+		defaultClosingReportRemotePrinter,
 
 		// Computed - Delivery
 		useDeliveryCharges,

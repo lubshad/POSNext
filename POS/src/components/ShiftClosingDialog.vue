@@ -527,6 +527,7 @@ import { useFormatters } from "../composables/useFormatters"
 import { useToast } from "../composables/useToast"
 import { usePOSSettingsStore } from "../stores/posSettings"
 import { usePOSShiftStore } from "../stores/posShift"
+import { useRemotePrintStore } from "../stores/remotePrint"
 import { printClosingReportWithFallback } from "../utils/printClosingReport"
 import TranslatedHTML from "./common/TranslatedHTML.vue"
 
@@ -558,6 +559,7 @@ const { hideExpectedAmount, printClosingReport, silentPrint } =
 	storeToRefs(posSettingsStore)
 
 const shiftStore = usePOSShiftStore()
+const remotePrintStore = useRemotePrintStore()
 
 const closingData = ref(null)
 const closingDataResource = getClosingShiftData
@@ -694,20 +696,72 @@ async function submitClosing() {
 			submitResource.data?.message?.name
 
 		if (closingShiftName && printClosingReport.value) {
-			const printResult = await printClosingReportWithFallback(
-				closingShiftName,
-				silentPrint.value,
-			)
-			if (!printResult.success) {
-				console.warn("Closing report print failed")
-				showWarning(
-					__("EOD report did not print. Use the Reprint button to retry."),
+			// Remote print mode is exclusive for client devices: queue remotely or fail.
+			// If the selected remote printer belongs to THIS hub device, local print is used.
+			if (
+				posSettingsStore.enableRemotePrinting &&
+				posSettingsStore.remotePrintClosingReports
+			) {
+				if (!posSettingsStore.defaultClosingReportRemotePrinter) {
+					showWarning(
+						__(
+							"Select a default remote closing report printer in POS Settings.",
+						),
+					)
+					eodPrintFailed.value = { closingShiftName }
+					showSuccessReport.value = true
+					return
+				}
+
+				if (
+					!remotePrintStore.isLocalPrinter(
+						posSettingsStore.defaultClosingReportRemotePrinter,
+					)
+				) {
+					try {
+						await remotePrintStore.createPrintJob({
+							remotePrinter: posSettingsStore.defaultClosingReportRemotePrinter,
+							jobType: "Closing Report",
+							referenceDoctype: "POS Closing Shift",
+							referenceName: closingShiftName,
+						})
+						console.log("[eod] remote print job queued for", closingShiftName)
+						eodPrintFailed.value = null
+					} catch (err) {
+						console.warn("[eod] remote print failed:", err?.message || err)
+						showWarning(
+							err?.message ||
+								__("Failed to send EOD report to the remote printer."),
+						)
+						eodPrintFailed.value = { closingShiftName }
+						showSuccessReport.value = true
+						return
+					}
+				}
+			}
+
+			if (
+				!posSettingsStore.enableRemotePrinting ||
+				!posSettingsStore.remotePrintClosingReports ||
+				remotePrintStore.isLocalPrinter(
+					posSettingsStore.defaultClosingReportRemotePrinter,
 				)
-				eodPrintFailed.value = { closingShiftName }
-				showSuccessReport.value = true
-				return
-			} else {
-				eodPrintFailed.value = null
+			) {
+				const printResult = await printClosingReportWithFallback(
+					closingShiftName,
+					silentPrint.value,
+				)
+				if (!printResult.success) {
+					console.warn("Closing report print failed")
+					showWarning(
+						__("EOD report did not print. Use the Reprint button to retry."),
+					)
+					eodPrintFailed.value = { closingShiftName }
+					showSuccessReport.value = true
+					return
+				} else {
+					eodPrintFailed.value = null
+				}
 			}
 		}
 
@@ -736,6 +790,38 @@ async function retryEodPrint() {
 
 	retryPrintLoading.value = true
 	try {
+		// Remote print mode is exclusive unless the selected printer is this hub's own printer.
+		if (
+			posSettingsStore.enableRemotePrinting &&
+			posSettingsStore.remotePrintClosingReports
+		) {
+			if (!posSettingsStore.defaultClosingReportRemotePrinter) {
+				showWarning(
+					__("Select a default remote closing report printer in POS Settings."),
+				)
+				return
+			}
+
+			if (
+				remotePrintStore.isLocalPrinter(
+					posSettingsStore.defaultClosingReportRemotePrinter,
+				)
+			) {
+				// Fall through to the local print path below.
+			} else {
+				await remotePrintStore.createPrintJob({
+					remotePrinter: posSettingsStore.defaultClosingReportRemotePrinter,
+					jobType: "Closing Report",
+					referenceDoctype: "POS Closing Shift",
+					referenceName: closingShiftName,
+				})
+				eodPrintFailed.value = null
+				showSuccess(__("EOD report sent to remote printer"))
+				closeDialog()
+				return
+			}
+		}
+
 		const printResult = await printClosingReportWithFallback(
 			closingShiftName,
 			silentPrint.value,

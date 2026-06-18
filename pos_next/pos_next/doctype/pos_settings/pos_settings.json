@@ -58,6 +58,16 @@
   "silent_print",
   "print_closing_report",
   "closing_report_print_format",
+  "section_break_remote_printing",
+  "enable_remote_printing",
+  "share_printers_remotely",
+  "column_break_remote",
+  "remote_print_invoices",
+  "remote_print_closing_reports",
+  "section_break_remote_defaults",
+  "default_invoice_remote_printer",
+  "column_break_remote_defaults",
+  "default_closing_report_remote_printer",
   "section_break_delivery",
   "use_delivery_charges",
   "auto_set_delivery_charges",
@@ -462,6 +472,73 @@
   },
   {
    "collapsible": 1,
+   "fieldname": "section_break_remote_printing",
+   "fieldtype": "Section Break",
+   "label": "Remote Printing"
+  },
+  {
+   "default": "0",
+   "description": "Send print jobs to remote printers shared by other POS devices over the network instead of printing locally",
+   "fieldname": "enable_remote_printing",
+   "fieldtype": "Check",
+   "label": "Enable Remote Printing"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.enable_remote_printing || doc.silent_print",
+   "description": "Share this device's local QZ Tray printers so other POS users can print to them remotely",
+   "fieldname": "share_printers_remotely",
+   "fieldtype": "Check",
+   "label": "Share This Device's Printers Remotely"
+  },
+  {
+   "fieldname": "column_break_remote",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "depends_on": "enable_remote_printing",
+   "description": "Send invoice receipts to a remote printer after checkout",
+   "fieldname": "remote_print_invoices",
+   "fieldtype": "Check",
+   "label": "Remote Print Invoices"
+  },
+  {
+   "default": "0",
+   "depends_on": "enable_remote_printing",
+   "description": "Send closing shift reports to a remote printer after closing the shift",
+   "fieldname": "remote_print_closing_reports",
+   "fieldtype": "Check",
+   "label": "Remote Print Closing Reports"
+  },
+  {
+   "fieldname": "section_break_remote_defaults",
+   "fieldtype": "Section Break",
+   "label": "Default Remote Printers",
+   "depends_on": "enable_remote_printing"
+  },
+  {
+   "depends_on": "enable_remote_printing",
+   "description": "Default remote printer for invoice receipts",
+   "fieldname": "default_invoice_remote_printer",
+   "fieldtype": "Link",
+   "label": "Default Invoice Remote Printer",
+   "options": "POS Remote Printer"
+  },
+  {
+   "fieldname": "column_break_remote_defaults",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "enable_remote_printing",
+   "description": "Default remote printer for closing shift reports",
+   "fieldname": "default_closing_report_remote_printer",
+   "fieldtype": "Link",
+   "label": "Default Closing Report Remote Printer",
+   "options": "POS Remote Printer"
+  },
+  {
+   "collapsible": 1,
    "fieldname": "section_break_delivery",
    "fieldtype": "Section Break",
    "label": "Delivery"
@@ -580,7 +657,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
-  "modified": "2026-06-03 15:54:09.903964",
+  "modified": "2026-06-18 13:30:00.000000",
  "modified_by": "Administrator",
  "module": "POS Next",
  "name": "POS Settings",

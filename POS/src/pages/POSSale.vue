@@ -1050,6 +1050,7 @@ import { cacheOfflineReceiptPayload } from "@/utils/offline/offlineReceiptCache"
 import { cacheInvoiceHistory, getCachedInvoiceHistory } from "@/utils/offline/sync";
 import {
 	hydrateLocalOnlyInvoice,
+	isLocalOnlyInvoiceName,
 	printInvoice,
 	printInvoiceByName,
 	printWithSilentFallback,
@@ -1072,6 +1073,7 @@ import { usePOSShiftStore } from "@/stores/posShift";
 import { usePOSSyncStore } from "@/stores/posSync";
 import { usePOSUIStore } from "@/stores/posUI";
 import { useBootstrapStore } from "@/stores/bootstrap";
+import { useRemotePrintStore } from "@/stores/remotePrint";
 import { logger } from "@/utils/logger";
 import { shouldValidateItemStock } from "@/utils/stockValidator";
 
@@ -1086,6 +1088,7 @@ const itemStore = useItemSearchStore();
 const stockStore = useStockStore();
 const customerSearchStore = useCustomerSearchStore();
 const bootstrapStore = useBootstrapStore();
+const remotePrintStore = useRemotePrintStore();
 // Note: settingsStore is an alias to posSettingsStore (same Pinia store singleton)
 const settingsStore = posSettingsStore;
 
@@ -1403,11 +1406,26 @@ onMounted(async () => {
 		{ immediate: true }
 	);
 
+	// Remote print hub lifecycle — start/stop sharing when setting changes
+	watch(
+		() => posSettingsStore.sharePrintersRemotely,
+		async (enabled) => {
+			if (enabled) {
+				await remotePrintStore.refreshSharedPrinters();
+				await remotePrintStore.startHub();
+			} else {
+				remotePrintStore.stopHub();
+			}
+		},
+		{ immediate: true }
+	);
+
 	// Store cleanup function for unmount
 	onUnmounted(() => {
 		cleanup();
 		stopActivityTracking();
 		qzDisconnect();
+		remotePrintStore.dispose();
 	});
 
 	try {
@@ -2153,7 +2171,7 @@ async function handlePaymentCompleted(paymentData) {
 				draftsStore.deleteDraft(draftIdToDelete);
 			}
 
-			if (shiftStore.autoPrintEnabled || posSettingsStore.silentPrint) {
+			if (shiftStore.autoPrintEnabled || posSettingsStore.silentPrint || posSettingsStore.remotePrintInvoices) {
 				try {
 					await handlePrintInvoice({ name: offlineReceiptName });
 					showSuccess(
@@ -2226,7 +2244,7 @@ async function handlePaymentCompleted(paymentData) {
 					log.debug("Background invoice cache refresh failed:", err)
 				);
 
-				if (shiftStore.autoPrintEnabled || posSettingsStore.silentPrint) {
+				if (shiftStore.autoPrintEnabled || posSettingsStore.silentPrint || posSettingsStore.remotePrintInvoices) {
 					try {
 						await handlePrintInvoice({ name: invoiceName });
 						showSuccess(__("Invoice {0} created and sent to printer", [invoiceName]));
@@ -2957,6 +2975,53 @@ async function handlePrintInvoice(invoiceData) {
 			offlineSnapshot.items?.length > 0
 		) {
 			invoiceData = offlineSnapshot;
+		}
+
+		// Remote print mode is exclusive for client devices: queue remotely or fail.
+		// If the selected remote printer belongs to THIS hub device, local QZ print is used.
+		if (posSettingsStore.enableRemotePrinting && posSettingsStore.remotePrintInvoices) {
+			if (!invoiceData?.name || isLocalOnlyInvoiceName(invoiceData.name)) {
+				window.frappe?.msgprint({
+					title: __("Remote Print Unavailable"),
+					message: __("Offline invoices cannot be sent to a remote printer until they are synced."),
+					indicator: "orange",
+				});
+				return;
+			}
+
+			if (!posSettingsStore.defaultInvoiceRemotePrinter) {
+				window.frappe?.msgprint({
+					title: __("Remote Printer Required"),
+					message: __("Select a default remote invoice printer in POS Settings."),
+					indicator: "orange",
+				});
+				return;
+			}
+
+			if (
+				!remotePrintStore.isLocalPrinter(
+					posSettingsStore.defaultInvoiceRemotePrinter,
+				)
+			) {
+				try {
+					await remotePrintStore.createPrintJob({
+						remotePrinter: posSettingsStore.defaultInvoiceRemotePrinter,
+						jobType: "Invoice",
+						referenceDoctype: "Sales Invoice",
+						referenceName: invoiceData.name,
+					});
+					log.info(`Remote print job queued for invoice ${invoiceData.name}`);
+					return; // Job queued — the hub will print it
+				} catch (error) {
+					log.error("Remote print failed:", error?.message || error);
+					window.frappe?.msgprint({
+						title: __("Remote Print Failed"),
+						message: error?.message || __("Failed to send invoice to the remote printer."),
+						indicator: "red",
+					});
+					return;
+				}
+			}
 		}
 
 		// Silent print path — send directly to thermal printer via QZ Tray

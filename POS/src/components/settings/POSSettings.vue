@@ -545,21 +545,169 @@
 													</div>
 												</div>
 
-												<!-- Help text -->
-												<div class="p-3 bg-teal-50 border border-teal-200 rounded-lg">
-													<div class="flex items-start gap-2">
-														<svg class="w-4 h-4 text-teal-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-															<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+											<!-- Help text -->
+											<div class="p-3 bg-teal-50 border border-teal-200 rounded-lg">
+												<div class="flex items-start gap-2">
+													<svg class="w-4 h-4 text-teal-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+													</svg>
+													<p class="text-xs text-teal-800 leading-relaxed">
+														{{ __('QZ Tray must be installed and running on this computer. Download from') }}
+														<a href="https://qz.io/download/" target="_blank" class="font-semibold underline">qz.io</a>.
+														{{ __('If QZ Tray is unavailable, printing will fall back to the browser dialog.') }}
+													</p>
+												</div>
+											</div>
+										</div>
+
+										<!-- Remote Printing Section -->
+										<div class="mt-4 pt-4 border-t border-gray-200 flex flex-col gap-3">
+											<CheckboxField
+												v-model="settings.enable_remote_printing"
+												:label="__('Enable Remote Printing')"
+												:description="__('Send print jobs to remote printers shared by other POS devices over the network')"
+											/>
+
+											<!-- Remote print job type toggles -->
+											<div v-if="settings.enable_remote_printing" class="ps-6 flex flex-col gap-2 border-s-2 border-indigo-200">
+												<CheckboxField
+													v-model="settings.remote_print_invoices"
+													:label="__('Remote Print Invoices')"
+													:description="__('Send invoice receipts to a remote printer after checkout')"
+												/>
+												<CheckboxField
+													v-model="settings.remote_print_closing_reports"
+													:label="__('Remote Print Closing Reports')"
+													:description="__('Send closing shift reports to a remote printer')"
+												/>
+											</div>
+
+											<!-- Default remote printer selectors -->
+											<div v-if="settings.enable_remote_printing" class="flex flex-col gap-3 mt-2">
+												<div class="flex items-end gap-2">
+													<div class="flex-1">
+														<SelectField
+															v-model="settings.default_invoice_remote_printer"
+															:label="__('Default Invoice Printer')"
+															:options="remotePrinterOptions('Receipt')"
+															:description="remotePrinterOptions('Receipt').length === 0 ? __('No online receipt printers') : ''"
+														/>
+													</div>
+												</div>
+												<div class="flex items-end gap-2">
+													<div class="flex-1">
+														<SelectField
+															v-model="settings.default_closing_report_remote_printer"
+															:label="__('Default Closing Report Printer')"
+															:options="remotePrinterOptions('Closing Report')"
+															:description="remotePrinterOptions('Closing Report').length === 0 ? __('No online closing report printers') : ''"
+														/>
+													</div>
+													<button
+														@click="loadRemotePrinters"
+														:disabled="remotePrintersLoading"
+														class="px-2 py-2 mb-0.5 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+														:title="__('Refresh remote printers')"
+													>
+														<svg class="w-4 h-4 text-gray-600" :class="remotePrintersLoading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+															<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
 														</svg>
-														<p class="text-xs text-teal-800 leading-relaxed">
-															{{ __('QZ Tray must be installed and running on this computer. Download from') }}
-															<a href="https://qz.io/download/" target="_blank" class="font-semibold underline">qz.io</a>.
-															{{ __('If QZ Tray is unavailable, printing will fall back to the browser dialog.') }}
-														</p>
+													</button>
+												</div>
+											</div>
+
+										<!-- Share this device's printers -->
+										<CheckboxField
+											v-model="settings.share_printers_remotely"
+											:label="__('Share This Device\'s Printers Remotely')"
+											:description="__('Allow other POS users to print to this device\'s local QZ Tray printers')"
+										/>
+
+											<!-- Hub sharing controls -->
+											<div v-if="settings.share_printers_remotely" class="ps-6 flex flex-col gap-3 border-s-2 border-teal-200">
+												<!-- Hub status -->
+												<div class="flex items-center gap-2">
+													<div
+														class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+														:class="hubActive ? 'bg-green-500' : 'bg-gray-400'"
+													></div>
+													<span class="text-xs font-medium" :class="hubActive ? 'text-green-700' : 'text-gray-600'">
+														{{ hubActive ? __('Print Hub Active') : __('Print Hub Inactive') }}
+													</span>
+													<span v-if="sharedPrintersList.length > 0" class="text-xs text-gray-500">
+														({{ sharedPrintersList.length }} printer{{ sharedPrintersList.length > 1 ? 's' : '' }} shared)
+													</span>
+												</div>
+
+												<!-- Add printer to share -->
+												<div class="flex flex-col gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+													<div class="flex items-end gap-2">
+														<div class="flex-1">
+															<SelectField
+																v-model="newSharedPrinter.qz_name"
+																:label="__('Local Printer')"
+																:options="qzPrinterOptions"
+																:description="qzPrinterOptions.length === 0 ? __('No printers found. Connect QZ Tray first.') : ''"
+															/>
+														</div>
+													</div>
+													<div class="flex items-end gap-2">
+														<div class="flex-1">
+															<input
+																v-model="newSharedPrinter.display_name"
+																type="text"
+																:placeholder="__('Display name for other users')"
+																class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+															/>
+														</div>
+													<div class="flex flex-wrap gap-2 mb-0.5">
+														<label
+															v-for="option in printerTypeOptions"
+															:key="option.value"
+															class="flex items-center gap-1.5 px-2.5 py-2 text-xs border border-gray-300 rounded-md bg-white text-gray-700 cursor-pointer hover:bg-gray-50"
+														>
+															<input
+																type="checkbox"
+																:checked="newSharedPrinter.allowed_types.includes(option.value)"
+																class="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+																@change="toggleSharedPrinterType(option.value)"
+															/>
+															<span>{{ option.label }}</span>
+														</label>
+													</div>
+														<button
+															@click="handleRegisterSharedPrinter"
+													:disabled="!newSharedPrinter.qz_name || !newSharedPrinter.display_name || newSharedPrinter.allowed_types.length === 0 || registeringPrinter"
+															class="px-3 py-2 mb-0.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 rounded-md transition-colors whitespace-nowrap"
+														>
+															{{ registeringPrinter ? __('Adding...') : __('Share') }}
+														</button>
+													</div>
+												</div>
+
+												<!-- List of shared printers -->
+												<div v-if="sharedPrintersList.length > 0" class="flex flex-col gap-1">
+													<div
+														v-for="p in sharedPrintersList"
+														:key="p.name"
+														class="flex items-center justify-between p-2 bg-gray-50 rounded-md border border-gray-200"
+													>
+														<div class="flex items-center gap-2 min-w-0">
+															<span class="w-1.5 h-1.5 rounded-full flex-shrink-0" :class="p.online ? 'bg-green-500' : 'bg-gray-400'"></span>
+															<span class="text-xs font-medium text-gray-800 truncate">{{ p.printer_name }}</span>
+															<span class="text-[10px] text-gray-500 px-1.5 py-0.5 bg-gray-200 rounded-full flex-shrink-0">{{ formatAllowedTypes(p) }}</span>
+														</div>
+														<button
+															@click="handleUnregisterPrinter(p)"
+															class="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded transition-colors flex-shrink-0"
+														>
+															{{ __('Remove') }}
+														</button>
 													</div>
 												</div>
 											</div>
 										</div>
+									</div>
 									</div>
 								</div>
 							</div>
@@ -599,6 +747,7 @@ import { logger } from "@/utils/logger"
 import { usePOSEvents } from "@/composables/usePOSEvents"
 import TranslatedHTML from "../common/TranslatedHTML.vue"
 import { useQzTray } from "@/composables/useQzTray"
+import { useRemotePrintStore } from "@/stores/remotePrint"
 
 const log = logger.create("POSSettings")
 const {
@@ -640,6 +789,12 @@ const settings = ref({
 	allow_partial_payment: 0,
 	silent_print: 0,
 	print_closing_report: 0,
+	enable_remote_printing: 0,
+	share_printers_remotely: 0,
+	remote_print_invoices: 0,
+	remote_print_closing_reports: 0,
+	default_invoice_remote_printer: "",
+	default_closing_report_remote_printer: "",
 	allow_negative_stock: 0,
 	tax_inclusive: 0,
 	allow_promotional_offers: 1,
@@ -674,6 +829,139 @@ const {
 	generateCertificate: handleSetupQzCertificate,
 	downloadCertificate: handleDownloadQzCertificate,
 } = useQzTray()
+
+// Remote print store
+const remotePrintStore = useRemotePrintStore()
+
+// Remote printing state
+const remotePrinters = ref([])
+const remotePrintersLoading = ref(false)
+const sharedPrintersList = ref([])
+const registeringPrinter = ref(false)
+const newSharedPrinter = ref({
+	qz_name: "",
+	display_name: "",
+	allowed_types: ["Receipt"],
+})
+
+const printerTypeOptions = [
+	{ label: __("Receipt"), value: "Receipt" },
+	{ label: __("Closing Report"), value: "Closing Report" },
+	{ label: __("General"), value: "General" },
+]
+
+const qzPrinterOptions = computed(() => {
+	if (!qzPrinters.value || qzPrinters.value.length === 0) return []
+	return qzPrinters.value.map((p) => ({ label: p, value: p }))
+})
+
+const hubActive = computed(() => remotePrintStore.isHubActive)
+
+function remotePrinterOptions(printerType) {
+	const all = remotePrinters.value
+	const filtered = printerType
+		? all.filter((p) => printerAllowsType(p, printerType))
+		: all
+	return filtered.map((p) => ({
+		label: `${p.printer_name}${p.online ? "" : " (offline)"}`,
+		value: p.name,
+	}))
+}
+
+function printerAllowedTypes(printer) {
+	if (Array.isArray(printer?.allowed_types) && printer.allowed_types.length > 0) {
+		return printer.allowed_types
+	}
+	return printer?.printer_type ? [printer.printer_type] : ["General"]
+}
+
+function printerAllowsType(printer, printerType) {
+	const allowedTypes = printerAllowedTypes(printer)
+	return allowedTypes.includes("General") || allowedTypes.includes(printerType)
+}
+
+function formatAllowedTypes(printer) {
+	return printerAllowedTypes(printer).join(", ")
+}
+
+function toggleSharedPrinterType(printerType) {
+	const current = newSharedPrinter.value.allowed_types
+	newSharedPrinter.value.allowed_types = current.includes(printerType)
+		? current.filter((value) => value !== printerType)
+		: [...current, printerType]
+}
+
+async function loadRemotePrinters() {
+	remotePrintersLoading.value = true
+	try {
+		await remotePrintStore.loadAvailablePrinters(props.posProfile)
+		remotePrinters.value = remotePrintStore.availablePrinters
+	} finally {
+		remotePrintersLoading.value = false
+	}
+}
+
+async function loadSharedPrinters() {
+	try {
+		await remotePrintStore.refreshSharedPrinters()
+		sharedPrintersList.value = remotePrintStore.sharedPrinters
+	} catch {
+		sharedPrintersList.value = []
+	}
+}
+
+async function handleRegisterSharedPrinter() {
+	if (
+		!newSharedPrinter.value.qz_name ||
+		!newSharedPrinter.value.display_name ||
+		newSharedPrinter.value.allowed_types.length === 0
+	)
+		return
+	registeringPrinter.value = true
+	try {
+		await remotePrintStore.registerPrinter({
+			printerName: newSharedPrinter.value.display_name,
+			qzPrinterName: newSharedPrinter.value.qz_name,
+			allowedTypes: newSharedPrinter.value.allowed_types,
+			printerType: newSharedPrinter.value.allowed_types[0],
+			posProfile: "",
+		})
+		sharedPrintersList.value = remotePrintStore.sharedPrinters
+		newSharedPrinter.value = {
+			qz_name: "",
+			display_name: "",
+			allowed_types: ["Receipt"],
+		}
+		showSuccess(__("Printer shared successfully"))
+	} catch (error) {
+		showError(error?.message || __("Failed to share printer"))
+	} finally {
+		registeringPrinter.value = false
+	}
+}
+
+async function handleUnregisterPrinter(printer) {
+	try {
+		await remotePrintStore.unregisterPrinter(printer.qz_printer_name)
+		sharedPrintersList.value = remotePrintStore.sharedPrinters
+		showSuccess(__("Printer removed from sharing"))
+	} catch (error) {
+		showError(error?.message || __("Failed to remove printer"))
+	}
+}
+
+// Watch share_printers_remotely to start/stop hub
+watch(
+	() => settings.value.share_printers_remotely,
+	async (enabled) => {
+		if (enabled) {
+			await loadSharedPrinters()
+			await remotePrintStore.startHub()
+		} else {
+			remotePrintStore.stopHub()
+		}
+	},
+)
 
 // Warehouse options
 const warehouseOptions = computed(() => {
@@ -816,6 +1104,13 @@ async function loadSettings() {
 
 		// Load settings
 		settingsResource.reload()
+
+		// Load remote printers for selection (non-blocking)
+		if (settings.value.enable_remote_printing) {
+			loadRemotePrinters()
+		}
+		// Load this device's shared printers
+		loadSharedPrinters()
 	} catch (error) {
 		log.error("Error loading warehouses:", error)
 		warehousesList.value = []
@@ -873,7 +1168,7 @@ async function saveSettings() {
 				},
 			)
 
-			if (warehouseResult && warehouseResult.success) {
+			if (warehouseResult?.success) {
 				// Add warehouse to new settings for change detection
 				// (detectSettingsChanges below will emit settings:warehouse-changed via event bus)
 				settings.value.warehouse = selectedWarehouse.value
@@ -1059,6 +1354,16 @@ onMounted(async () => {
 		clearInterval(statusInterval)
 	})
 })
+
+// Load remote printers when remote printing is toggled on
+watch(
+	() => settings.value.enable_remote_printing,
+	(enabled) => {
+		if (enabled) {
+			loadRemotePrinters()
+		}
+	},
+)
 </script>
 
 <style scoped>
