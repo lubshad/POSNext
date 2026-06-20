@@ -53,6 +53,8 @@
   "allow_customer_purchase_order",
   "allow_duplicate_customer_names",
   "fetch_coupon",
+  "allow_promotional_offers",
+  "allow_coupons",
   "section_break_printing",
   "allow_print_last_invoice",
   "silent_print",

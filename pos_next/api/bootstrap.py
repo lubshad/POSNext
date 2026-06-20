@@ -209,10 +209,11 @@ def _get_pos_settings(pos_profile_doc):
 	try:
 		settings = frappe.db.get_value(
 			"POS Settings",
-			{"pos_profile": pos_profile_doc.name, "enabled": 1},
+			{"pos_profile": pos_profile_doc.name},
 			POS_SETTINGS_FIELDS,
 			as_dict=True
 		) or DEFAULT_POS_SETTINGS.copy()
+		settings["pos_profile"] = pos_profile_doc.name
 
 		# Derive from POS Profile (single source of truth)
 		settings["allow_write_off_change"] = 1 if (
@@ -223,7 +224,9 @@ def _get_pos_settings(pos_profile_doc):
 		return settings
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Get POS Settings Error")
-		return DEFAULT_POS_SETTINGS.copy()
+		settings = DEFAULT_POS_SETTINGS.copy()
+		settings["pos_profile"] = pos_profile_doc.name
+		return settings
 
 
 def _get_payment_methods(pos_profile_name):

@@ -17,6 +17,7 @@ Note: Some settings are derived from POS Profile as single source of truth:
 # Used by both bootstrap.py and pos_profile.py
 POS_SETTINGS_FIELDS = [
 	"name",
+	"pos_profile",
 	"enabled",
 	"tax_inclusive",
 	"allow_user_to_edit_additional_discount",
@@ -53,6 +54,7 @@ POS_SETTINGS_FIELDS = [
 # Default POS Settings values
 # Used when no POS Settings found or on error
 DEFAULT_POS_SETTINGS = {
+	"pos_profile": "",
 	"enabled": 0,
 	"tax_inclusive": 0,
 	"allow_user_to_edit_additional_discount": 0,
