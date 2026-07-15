@@ -407,6 +407,46 @@ def list_remote_printers(
 
 
 @frappe.whitelist()
+def get_invoice_raw_print_payload(invoice_name: str) -> dict:
+	"""Render a Sales Invoice as raw ESC/POS commands for local thermal printing."""
+	if not invoice_name:
+		frappe.throw(_("invoice_name is required"))
+
+	invoice = frappe.db.get_value(
+		"Sales Invoice",
+		invoice_name,
+		["name", "pos_profile"],
+		as_dict=True,
+	)
+	if not invoice:
+		frappe.throw(_("Sales Invoice {0} not found").format(invoice_name))
+
+	if not frappe.has_permission("Sales Invoice", "read", invoice_name):
+		frappe.throw(_("You do not have access to Sales Invoice {0}").format(invoice_name))
+
+	_validate_pos_profile_access(invoice.pos_profile)
+	print_format = _resolve_invoice_print_format(invoice.pos_profile)
+	if not _is_raw_print_format(print_format):
+		frappe.throw(_("Print Format {0} is not configured for raw ESC/POS printing").format(print_format))
+
+	raw = frappe.get_attr("frappe.www.printview.get_rendered_raw_commands")(
+		doc="Sales Invoice",
+		name=invoice.name,
+		print_format=print_format,
+	)
+	raw_commands = raw.get("raw_commands") if isinstance(raw, dict) else None
+	if not raw_commands:
+		frappe.throw(_("Failed to render raw print commands for {0}").format(invoice.name))
+
+	return {
+		"type": "raw",
+		"invoice_name": invoice.name,
+		"print_format": print_format,
+		"raw_commands": raw_commands,
+	}
+
+
+@frappe.whitelist()
 def create_remote_print_job(
 	remote_printer: str,
 	job_type: str,

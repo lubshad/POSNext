@@ -56,6 +56,7 @@
   "allow_promotional_offers",
   "allow_coupons",
   "section_break_printing",
+  "invoice_logo",
   "allow_print_last_invoice",
   "silent_print",
   "print_closing_report",
@@ -445,6 +446,12 @@
    "label": "Printing"
   },
   {
+   "description": "Logo shown on POS invoice and receipt prints",
+   "fieldname": "invoice_logo",
+   "fieldtype": "Attach Image",
+   "label": "Invoice Logo"
+  },
+  {
    "default": "0",
    "description": "Reprint the last invoice",
    "fieldname": "allow_print_last_invoice",
@@ -659,7 +666,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
-  "modified": "2026-06-18 13:30:00.000000",
+  "modified": "2026-06-29 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "POS Next",
  "name": "POS Settings",

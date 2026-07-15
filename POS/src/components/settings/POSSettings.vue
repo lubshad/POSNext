@@ -640,9 +640,9 @@
 												</div>
 
 												<!-- Add printer to share -->
-												<div class="flex flex-col gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-													<div class="flex items-end gap-2">
-														<div class="flex-1">
+												<div class="flex flex-col gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+													<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+														<div>
 															<SelectField
 																v-model="newSharedPrinter.qz_name"
 																:label="__('Local Printer')"
@@ -650,54 +650,61 @@
 																:description="qzPrinterOptions.length === 0 ? __('No printers found. Connect QZ Tray first.') : ''"
 															/>
 														</div>
-													</div>
-													<div class="flex items-end gap-2">
-														<div class="flex-1">
+														<div class="p-2">
+															<label for="shared-printer-name" class="block text-sm font-medium text-gray-900 mb-1">
+																{{ __('Printer Name') }}
+															</label>
 															<input
+																id="shared-printer-name"
 																v-model="newSharedPrinter.display_name"
 																type="text"
 																:placeholder="__('Display name for other users')"
 																class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
 															/>
-												</div>
-											<div class="flex flex-wrap gap-2 mb-0.5">
-														<label
-															v-for="option in printerTypeOptions"
-															:key="option.value"
-															class="flex items-center gap-1.5 px-2.5 py-2 text-xs border border-gray-300 rounded-md bg-white text-gray-700 cursor-pointer hover:bg-gray-50"
-														>
-															<input
-																type="checkbox"
-																:checked="newSharedPrinter.allowed_types.includes(option.value)"
-																class="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-																@change="toggleSharedPrinterType(option.value)"
-															/>
-															<span>{{ option.label }}</span>
-														</label>
-											</div>
-											<div class="w-full flex flex-col gap-1">
-												<div class="text-xs font-medium text-gray-700">{{ __('POS Profiles') }}</div>
-												<p class="text-[11px] text-gray-500">{{ __('Leave empty to share this printer across all POS Profiles.') }}</p>
-												<div class="flex flex-wrap gap-2">
-													<label
-														v-for="option in posProfileOptions"
-														:key="option.value"
-														class="flex items-center gap-1.5 px-2.5 py-2 text-xs border border-gray-300 rounded-md bg-white text-gray-700 cursor-pointer hover:bg-gray-50"
-													>
-														<input
-															type="checkbox"
-															:checked="newSharedPrinter.pos_profiles.includes(option.value)"
-															class="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-															@change="toggleSharedPrinterProfile(option.value)"
-														/>
-														<span>{{ option.label }}</span>
-													</label>
-												</div>
-											</div>
-												<button
+														</div>
+													</div>
+													<div class="flex flex-col gap-1">
+														<div class="text-xs font-medium text-gray-700">{{ __('Printer Types') }}</div>
+														<div class="flex flex-wrap gap-2">
+															<label
+																v-for="option in printerTypeOptions"
+																:key="option.value"
+																class="flex items-center gap-1.5 px-2.5 py-2 text-xs border border-gray-300 rounded-md bg-white text-gray-700 cursor-pointer hover:bg-gray-50"
+															>
+																<input
+																	type="checkbox"
+																	:checked="newSharedPrinter.allowed_types.includes(option.value)"
+																	class="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+																	@change="toggleSharedPrinterType(option.value)"
+																/>
+																<span>{{ option.label }}</span>
+															</label>
+														</div>
+													</div>
+													<div class="flex flex-col gap-1">
+														<div class="text-xs font-medium text-gray-700">{{ __('POS Profiles') }}</div>
+														<p class="text-[11px] text-gray-500">{{ __('Leave empty to share this printer across all POS Profiles.') }}</p>
+														<div class="flex flex-wrap gap-2">
+															<label
+																v-for="option in posProfileOptions"
+																:key="option.value"
+																class="flex items-center gap-1.5 px-2.5 py-2 text-xs border border-gray-300 rounded-md bg-white text-gray-700 cursor-pointer hover:bg-gray-50"
+															>
+																<input
+																	type="checkbox"
+																	:checked="newSharedPrinter.pos_profiles.includes(option.value)"
+																	class="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+																	@change="toggleSharedPrinterProfile(option.value)"
+																/>
+																<span>{{ option.label }}</span>
+															</label>
+														</div>
+													</div>
+													<div class="flex justify-end">
+														<button
 															@click="handleRegisterSharedPrinter"
-													:disabled="!newSharedPrinter.qz_name || !newSharedPrinter.display_name || newSharedPrinter.allowed_types.length === 0 || registeringPrinter"
-															class="px-3 py-2 mb-0.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 rounded-md transition-colors whitespace-nowrap"
+															:disabled="!newSharedPrinter.qz_name || !newSharedPrinter.display_name || newSharedPrinter.allowed_types.length === 0 || registeringPrinter"
+															class="px-3 py-2 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 rounded-md transition-colors whitespace-nowrap"
 														>
 															{{ registeringPrinter ? __('Adding...') : __('Share') }}
 														</button>
