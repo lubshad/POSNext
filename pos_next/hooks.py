@@ -190,7 +190,6 @@ scheduler_events = {
 	"daily": [
 		"pos_next.tasks.cleanup_expired_promotions.cleanup_expired_promotions",
 		"pos_next.tasks.branding_monitor.validate_all_active_sessions",
-		"pos_next.api.remote_print.mark_stale_printers_offline",
 	],
 	"monthly": [
 		"pos_next.tasks.branding_monitor.reset_tampering_counter",

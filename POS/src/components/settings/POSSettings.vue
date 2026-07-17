@@ -898,7 +898,10 @@ function remotePrinterOptions(printerType) {
 }
 
 function printerAllowedTypes(printer) {
-	if (Array.isArray(printer?.allowed_types) && printer.allowed_types.length > 0) {
+	if (
+		Array.isArray(printer?.allowed_types) &&
+		printer.allowed_types.length > 0
+	) {
 		return printer.allowed_types
 	}
 	return ["General"]
@@ -942,13 +945,17 @@ function toggleSharedPrinterProfile(posProfile) {
 async function loadPOSProfileOptions() {
 	try {
 		const data = await call("pos_next.api.shifts.get_opening_dialog_data")
-		const profiles = data?.message?.pos_profiles_data || data?.pos_profiles_data || []
+		const profiles =
+			data?.message?.pos_profiles_data || data?.pos_profiles_data || []
 		posProfileOptions.value = profiles.map((profile) => ({
 			label: profile.name,
 			value: profile.name,
 		}))
 	} catch (error) {
-		log.warn("Failed to load POS profiles for remote printer scope:", error?.message || error)
+		log.warn(
+			"Failed to load POS profiles for remote printer scope:",
+			error?.message || error,
+		)
 		posProfileOptions.value = props.posProfile
 			? [{ label: props.posProfile, value: props.posProfile }]
 			: []
@@ -1081,6 +1088,9 @@ const settingsResource = createResource({
 		if (data) {
 			Object.assign(settings.value, data)
 			settings.value.pos_profile = props.posProfile
+			if (settings.value.enable_remote_printing) {
+				loadRemotePrinters()
+			}
 			// Store original value
 			originalAllowNegativeStock.value = data.allow_negative_stock
 			// Update event system snapshot
@@ -1170,10 +1180,6 @@ async function loadSettings() {
 		settingsResource.reload()
 		loadPOSProfileOptions()
 
-		// Load remote printers for selection (non-blocking)
-		if (settings.value.enable_remote_printing) {
-			loadRemotePrinters()
-		}
 		// Load this device's shared printers
 		loadSharedPrinters()
 	} catch (error) {

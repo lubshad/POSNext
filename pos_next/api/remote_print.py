@@ -687,27 +687,3 @@ def fail_remote_print_job(job_name: str, error_message: str | None = None):
 	job.save()
 	frappe.db.commit()
 	return {"job": job_name, "status": "Failed", "attempts": job.attempts}
-
-
-# ---------------------------------------------------------------------------
-# Scheduled maintenance
-# ---------------------------------------------------------------------------
-
-
-def mark_stale_printers_offline():
-	"""Disable printers that haven't sent a heartbeat in 5 minutes.
-
-	Register as a scheduled task so the printer list stays clean even when
-	devices disconnect without calling ``unregister_remote_printers``.
-	"""
-	threshold = frappe.utils.add_to_date(None, minutes=-5)
-	stale = frappe.get_all(
-		DOCTYPE_REMOTE_PRINTER,
-		filters={"enabled": 1, "last_seen": ["<", threshold]},
-		pluck="name",
-	)
-	for name in stale:
-		frappe.db.set_value(DOCTYPE_REMOTE_PRINTER, name, "enabled", 0, update_modified=False)
-	if stale:
-		frappe.db.commit()
-	return len(stale)

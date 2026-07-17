@@ -59,8 +59,8 @@ export function useToast() {
 		showToastNotification(__("Error"), message, "error")
 	}
 
-	function showWarning(message) {
-		showToastNotification(__("Validation Error"), message, "warning")
+	function showWarning(message, title = __("Validation Error")) {
+		showToastNotification(title, message, "warning")
 	}
 
 	function showInfo(message) {

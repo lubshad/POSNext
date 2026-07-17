@@ -336,7 +336,10 @@ async function isRawPrintFormat(printFormat) {
 }
 
 function containsRawPrinterCommands(value) {
-	return typeof value === "string" && /[\x1b\x1d]/.test(value)
+	return (
+		typeof value === "string" &&
+		(value.includes("\x1b") || value.includes("\x1d"))
+	)
 }
 
 // ============================================================================
@@ -449,7 +452,12 @@ export async function printInvoiceByName(
 // Silent printing (QZ Tray — no browser dialog)
 // ============================================================================
 
-export async function silentPrintDoc(doctype, name, printFormat, printerName = null) {
+export async function silentPrintDoc(
+	doctype,
+	name,
+	printFormat,
+	printerName = null,
+) {
 	const result = await call("frappe.www.printview.get_html_and_style", {
 		doc: doctype,
 		name,
@@ -486,7 +494,8 @@ export async function silentPrintInvoice(
 ) {
 	if (isLocalOnlyInvoiceName(invoiceName)) {
 		const doc = await hydrateLocalOnlyInvoice({ name: invoiceName })
-		if (doc.items?.length > 0) return silentPrintInvoiceFromDoc(doc, printerName)
+		if (doc.items?.length > 0)
+			return silentPrintInvoiceFromDoc(doc, printerName)
 		throw new Error(
 			__(
 				"This offline receipt is no longer in browser storage. Use browser print from the success dialog after checkout.",
@@ -531,7 +540,11 @@ export async function silentPrintInvoice(
  * Fetch server-rendered raw commands and send them directly to QZ Tray.
  * The selected print format must have Raw Printing enabled in Frappe.
  */
-export async function rawPrintInvoice(invoiceName, printFormat, printerName = null) {
+export async function rawPrintInvoice(
+	invoiceName,
+	printFormat,
+	printerName = null,
+) {
 	const format = printFormat || DEFAULT_PRINT_FORMAT
 	const result = await call("frappe.www.printview.get_rendered_raw_commands", {
 		doc: "Sales Invoice",
@@ -551,7 +564,10 @@ export async function rawPrintInvoice(invoiceName, printFormat, printerName = nu
 /**
  * Silent-print a full invoice dict using the same HTML as the offline receipt fallback.
  */
-export async function silentPrintInvoiceFromDoc(invoiceData, printerName = null) {
+export async function silentPrintInvoiceFromDoc(
+	invoiceData,
+	printerName = null,
+) {
 	const fullHTML = buildReceiptDocumentHTML(invoiceData, {
 		includeControls: false,
 	})
@@ -639,7 +655,7 @@ export async function printWithSilentFallback(
 		return { method: "browser", success: true }
 	} catch (err) {
 		log.error("Browser print fallback also failed:", err)
-		return { method: "browser", success: false }
+		throw err
 	}
 }
 

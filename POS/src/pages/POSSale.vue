@@ -2173,19 +2173,22 @@ async function handlePaymentCompleted(paymentData) {
 
 			if (shiftStore.autoPrintEnabled || posSettingsStore.silentPrint || posSettingsStore.remotePrintInvoices) {
 				try {
-					await handlePrintInvoice({ name: offlineReceiptName });
+					const printResult = await handlePrintInvoice({ name: offlineReceiptName });
 					showSuccess(
-						__("Invoice {0} saved offline and sent to printer — will sync when online", [
+						__("Invoice {0} saved offline and {1} — will sync when online", [
 							offlineReceiptName,
+							printResult.message,
 						]),
 					);
 				} catch (error) {
 					log.error("Offline auto-print error:", error);
 					uiStore.showSuccess(offlineReceiptName, grandTotal, paymentData.paid_amount);
 					showWarning(
-						__("Invoice {0} saved offline but print failed — open Print from the success dialog", [
+						__("Invoice {0} saved offline, but printing failed: {1}", [
 							offlineReceiptName,
+							getPrintErrorMessage(error),
 						]),
+						__("Print Failed"),
 					);
 				}
 			} else {
@@ -2246,11 +2249,17 @@ async function handlePaymentCompleted(paymentData) {
 
 				if (shiftStore.autoPrintEnabled || posSettingsStore.silentPrint || posSettingsStore.remotePrintInvoices) {
 					try {
-						await handlePrintInvoice({ name: invoiceName });
-						showSuccess(__("Invoice {0} created and sent to printer", [invoiceName]));
+						const printResult = await handlePrintInvoice({ name: invoiceName });
+						showSuccess(__("Invoice {0} created and {1}", [invoiceName, printResult.message]));
 					} catch (error) {
 						log.error("Auto-print error:", error);
-						showWarning(__("Invoice {0} created but print failed", [invoiceName]));
+						showWarning(
+							__("Invoice {0} created, but printing failed: {1}", [
+								invoiceName,
+								getPrintErrorMessage(error),
+							]),
+							__("Print Failed"),
+						);
 					}
 				} else {
 					uiStore.showSuccess(invoiceName, invoiceTotal, paidAmount);
@@ -2966,89 +2975,71 @@ function handleViewInvoice(invoice) {
 
 // Centralized print handler - uses printInvoice.js utilities
 async function handlePrintInvoice(invoiceData) {
-	try {
-		invoiceData = await hydrateLocalOnlyInvoice(invoiceData || {});
-		const offlineSnapshot = uiStore.lastOfflinePrintDoc;
-		if (
-			invoiceData?.name &&
-			offlineSnapshot?.name === invoiceData.name &&
-			offlineSnapshot.items?.length > 0
-		) {
-			invoiceData = offlineSnapshot;
-		}
-
-		// Remote print mode is exclusive for client devices: queue remotely or fail.
-		// If the selected remote printer belongs to THIS hub device, local QZ print is used.
-		if (posSettingsStore.enableRemotePrinting && posSettingsStore.remotePrintInvoices) {
-			if (!invoiceData?.name || isLocalOnlyInvoiceName(invoiceData.name)) {
-				window.frappe?.msgprint({
-					title: __("Remote Print Unavailable"),
-					message: __("Offline invoices cannot be sent to a remote printer until they are synced."),
-					indicator: "orange",
-				});
-				return;
-			}
-
-			if (!posSettingsStore.defaultInvoiceRemotePrinter) {
-				window.frappe?.msgprint({
-					title: __("Remote Printer Required"),
-					message: __("Select a default remote invoice printer in POS Settings."),
-					indicator: "orange",
-				});
-				return;
-			}
-
-			if (
-				!remotePrintStore.isLocalPrinter(
-					posSettingsStore.defaultInvoiceRemotePrinter,
-				)
-			) {
-				try {
-					await remotePrintStore.createPrintJob({
-						remotePrinter: posSettingsStore.defaultInvoiceRemotePrinter,
-						jobType: "Invoice",
-						referenceDoctype: "Sales Invoice",
-						referenceName: invoiceData.name,
-					});
-					log.info(`Remote print job queued for invoice ${invoiceData.name}`);
-					return; // Job queued — the hub will print it
-				} catch (error) {
-					log.error("Remote print failed:", error?.message || error);
-					window.frappe?.msgprint({
-						title: __("Remote Print Failed"),
-						message: error?.message || __("Failed to send invoice to the remote printer."),
-						indicator: "red",
-					});
-					return;
-				}
-			}
-		}
-
-		// Silent print path — send directly to thermal printer via QZ Tray
-		if (posSettingsStore.silentPrint) {
-			const result = await printWithSilentFallback(invoiceData);
-			if (result.method === "browser") {
-				log.info("Used browser print fallback");
-			}
-			return;
-		}
-
-		// Standard browser print path
-		if (invoiceData.items && Array.isArray(invoiceData.items)) {
-			await printInvoice(invoiceData);
-		} else {
-			// If it's just an invoice object with name, fetch and print
-			// printInvoiceByName will automatically fetch the print format from the invoice's POS Profile
-			await printInvoiceByName(invoiceData.name);
-		}
-	} catch (error) {
-		log.error("Error printing invoice:", error);
-		window.frappe?.msgprint({
-			title: "Error",
-			message: "Failed to print invoice",
-			indicator: "red",
-		});
+	invoiceData = await hydrateLocalOnlyInvoice(invoiceData || {});
+	const offlineSnapshot = uiStore.lastOfflinePrintDoc;
+	if (
+		invoiceData?.name &&
+		offlineSnapshot?.name === invoiceData.name &&
+		offlineSnapshot.items?.length > 0
+	) {
+		invoiceData = offlineSnapshot;
 	}
+
+	// Remote print mode is exclusive for client devices: queue remotely or fail.
+	// If the selected remote printer belongs to THIS hub device, local QZ print is used.
+	if (posSettingsStore.enableRemotePrinting && posSettingsStore.remotePrintInvoices) {
+		if (!invoiceData?.name || isLocalOnlyInvoiceName(invoiceData.name)) {
+			throw new Error(__("Offline invoices cannot be sent to a remote printer until they are synced."));
+		}
+
+		if (!posSettingsStore.defaultInvoiceRemotePrinter) {
+			throw new Error(__("Select a default remote invoice printer in POS Settings."));
+		}
+
+		if (
+			!remotePrintStore.isLocalPrinter(
+				posSettingsStore.defaultInvoiceRemotePrinter,
+			)
+		) {
+			await remotePrintStore.createPrintJob({
+				remotePrinter: posSettingsStore.defaultInvoiceRemotePrinter,
+				jobType: "Invoice",
+				referenceDoctype: "Sales Invoice",
+				referenceName: invoiceData.name,
+			});
+			log.info(`Remote print job queued for invoice ${invoiceData.name}`);
+			return { method: "remote", message: __("queued for printing") };
+		}
+		}
+
+	// Silent print path — send directly to thermal printer via QZ Tray
+	if (posSettingsStore.silentPrint) {
+		const result = await printWithSilentFallback(invoiceData);
+		if (!result.success) {
+			throw new Error(__("Failed to print invoice."));
+		}
+		if (result.method === "browser") {
+			log.info("Used browser print fallback");
+		}
+		return {
+			method: result.method,
+			message: result.method === "browser" ? __("opened in the browser print dialog") : __("sent to printer"),
+		};
+	}
+
+	// Standard browser print path
+	if (invoiceData.items && Array.isArray(invoiceData.items)) {
+		await printInvoice(invoiceData);
+	} else {
+		// If it's just an invoice object with name, fetch and print
+		// printInvoiceByName will automatically fetch the print format from the invoice's POS Profile
+		await printInvoiceByName(invoiceData.name);
+	}
+	return { method: "browser", message: __("opened in the browser print dialog") };
+}
+
+function getPrintErrorMessage(error) {
+	return error?.message || __("Failed to print invoice.");
 }
 
 // Note: handleLoadDraft already exists above, will delegate to it
